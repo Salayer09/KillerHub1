@@ -1,5 +1,5 @@
 -- ============================================================================
--- 🚀 KILLER HUB - SCRIPT EJECUTOR ADAPTADO (API V2.3 - EDICIÓN LIMPIA)
+-- 🚀 KILLER HUB - SCRIPT EJECUTOR OPTIMIZADO (LOGICA ANTI-MISS V3.5 RE-BUILT)
 -- ============================================================================
 
 -- 1️⃣ Cargar la librería base desde su link oficial
@@ -18,8 +18,8 @@ local states = {
     TracerPrediction = false,
     JumpPrediction = false,         
     TracerSpeed = 0.85,             
-    HorizontalPrediction = 0.34,    
-    VerticalPrediction = 0.15,      
+    HorizontalPrediction = 1.00, -- Por defecto en 100
+    VerticalPrediction = 1.00,   -- Por defecto en 100
     ShowShootButton = false,
     LockButton = false,
     ButtonSize = 100, 
@@ -105,8 +105,8 @@ local function loadButtonConfig()
             if result.TracerPrediction ~= nil then states.TracerPrediction = result.TracerPrediction end
             if result.JumpPrediction ~= nil then states.JumpPrediction = result.JumpPrediction end
             states.TracerSpeed = result.TracerSpeed or 0.85
-            states.HorizontalPrediction = result.HorizontalPrediction or 0.34
-            states.VerticalPrediction = result.VerticalPrediction or 0.15
+            states.HorizontalPrediction = result.HorizontalPrediction or 1.00
+            states.VerticalPrediction = result.VerticalPrediction or 1.00
             
             if result.ShowShootButton ~= nil then states.ShowShootButton = result.ShowShootButton end
             if result.LockButton ~= nil then states.LockButton = result.LockButton end
@@ -164,16 +164,15 @@ local function tienePistola()
 end
 
 -- ============================================================================
--- 🧱 CONSTRUCCIÓN DE COMPONENTES INTERFAZ (NUEVA API)
+-- 🧱 CONSTRUCCIÓN DE COMPONENTES INTERFAZ (SLIDERS FIJOS DE 0 A 150/125)
 -- ============================================================================
 
--- 🎯 PESTAÑA SHERIFF
 Sheriff:CreateSection("Target Prediction")
 Sheriff:CreateToggle("S_TracerPrediction", "Prediction Guide", function(state) states.TracerPrediction = state saveButtonConfig() end)
 Sheriff:CreateToggle("S_JumpPrediction", "Jump Prediction", function(state) states.JumpPrediction = state saveButtonConfig() end)
-Sheriff:CreateSlider("S_TracerSpeed", "Fast sliding of tracer", 1, 100, function(val) states.TracerSpeed = val / 100 saveButtonConfig() end)
-Sheriff:CreateSlider("S_HorizontalPred", "Horizontal Tuning", 0, 100, function(val) states.HorizontalPrediction = val / 100 saveButtonConfig() end)
-Sheriff:CreateSlider("S_VerticalPred", "Vertical Tuning", 0, 100, function(val) states.VerticalPrediction = val / 100 saveButtonConfig() end)
+Sheriff:CreateSlider("S_TracerSpeed", "Tracer Speed Tuning", 25, 125, function(val) states.TracerSpeed = val / 100 saveButtonConfig() end)
+Sheriff:CreateSlider("S_HorizontalPred", "Horizontal Tuning", 0, 150, function(val) states.HorizontalPrediction = val / 100 saveButtonConfig() end)
+Sheriff:CreateSlider("S_VerticalPred", "Vertical Tuning", 0, 125, function(val) states.VerticalPrediction = val / 100 saveButtonConfig() end)
 
 Sheriff:CreateSection("Combat Filters")
 Sheriff:CreateToggle("S_WallCheck", "Wall Check", function(state) states.WallCheck = state saveButtonConfig() end)
@@ -208,10 +207,10 @@ Murder:CreateColorPicker("KnifeFovColor", "Color Dinámico del FOV", Color3.from
     saveButtonConfig()
 end)
 
--- 🚀 PESTAÑA EXTRAS (Limpia a petición del usuario)
+-- 🚀 PESTAÑA EXTRAS
 Extras:CreateSection("Extras de Rendimiento")
 
--- ⚙️ PESTAÑA SETTINGS (Framework del Menú)
+-- ⚙️ PESTAÑA SETTINGS
 Settings:CreateSection("Configuración del Framework")
 Settings:CreateKeybind("MenuToggle", "Tecla para Ocultar Hub", Enum.KeyCode.RightControl, function(key) end)
 
@@ -230,7 +229,7 @@ local TweenService = game:GetService("TweenService")
 
 local rolesPartida = {}
 local ultimoPosTarget = Vector3.new()
-local ultimoPosLeadTarget = Vector3.new()
+local ultimoPuntoLead = Vector3.new() -- Motor visual estabilizado para Lead Time
 local gunVelocidadFiltrada = Vector3.new()
 local knifeVelocidadFiltrada = Vector3.new() 
 local lastKnifeTarget = nil
@@ -374,7 +373,7 @@ local function getClosestTargetInFOV()
         if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
             local targetHum = v.Character:FindFirstChildOfClass("Humanoid")
             if targetHum and targetHum.Health > 0 then
-                local hrp = v.Character.HumanoidRootPart
+                 local hrp = v.Character.HumanoidRootPart
                 local screenPos, onScreen = camera:WorldToViewportPoint(hrp.Position)
                 if onScreen then
                     local fovDist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
@@ -383,7 +382,7 @@ local function getClosestTargetInFOV()
                         near = v
                     end
                 end
-            end
+             end
         end
     end
     return near
@@ -400,7 +399,7 @@ local function getHandPosition()
 end
 
 -- ============================================================================
--- 🎯 MOTOR DE TIRO PREMIUM RE-CALIBRADO (ANTI-SOBREPREDICCIÓN Y FIJO EN RANGO)
+-- 🎯 MOTOR DE PREDICCIÓN ACTUALIZADO: BALÍSTICA SUAVE ANTI-FALLOS
 -- ============================================================================
 local function getGunPredictedPosition(murdererChar)
     if not murdererChar or not murdererChar:FindFirstChild("HumanoidRootPart") then return nil end
@@ -409,56 +408,50 @@ local function getGunPredictedPosition(murdererChar)
     local targetHum = murdererChar:FindFirstChildOfClass("Humanoid")
     if not myHRP or not targetHRP then return nil end
     
-    local distancia = (myHRP.Position - targetHRP.Position).Magnitude
-    
-    local ping = 0.06
+    -- 1. Latencia adaptable amortiguada
+    local ping = 0.05
     pcall(function() ping = Stats.Network.ServerStatsItem["Data Ping"]:GetValue() / 1000 end)
-    ping = math.clamp(ping, 0, 0.24)
-     
-    local tiempoDeVuelo = 0.09 + ping
+    ping = math.clamp(ping, 0, 0.22)
     
-    if not lastGunTarget or lastGunTarget ~= murdererChar then
-        lastGunTarget = murdererChar
-        gunVelocidadFiltrada = targetHRP.Velocity
-    else
-        gunVelocidadFiltrada = gunVelocidadFiltrada:Lerp(targetHRP.Velocity, 0.08)
-    end
+    -- 2. Tiempo de vuelo DINÁMICO (Basado en studs reales y proyectil de MM2)
+    local distancia = (myHRP.Position - targetHRP.Position).Magnitude
+    local velocidadBala = 245
+    local tiempoDeVuelo = (distancia / velocidadBala) + (ping * 1.05)
     
-    local factorDireccion = 1
-    local currentVel = targetHRP.Velocity
-    if currentVel.Magnitude > 1 and gunVelocidadFiltrada.Magnitude > 1 then
-        local dotProduct = (currentVel.X * gunVelocidadFiltrada.X + currentVel.Z * gunVelocidadFiltrada.Z) / (currentVel.Magnitude * gunVelocidadFiltrada.Magnitude)
-        if dotProduct < 0 then
-            factorDireccion = 0.30 
-        end
-    end
+    local multiH = states.HorizontalPrediction or 1.00
+    local multiV = states.VerticalPrediction or 1.00
     
-    local multiH = states.HorizontalPrediction or 0.34
-    local multiV = states.VerticalPrediction or 0.15
+    -- 3. Amortiguador por Inercia Horizontal
+    local factorInercia = math.clamp(targetHRP.Velocity.Magnitude / 16, 0.15, 1.1)
     
-    local factorDistancia = math.clamp((distancia - 3) / 13, 0.10, 1.0)
+    local xOffset = gunVelocidadFiltrada.X * multiH * tiempoDeVuelo * factorInercia
+    local zOffset = gunVelocidadFiltrada.Z * multiH * tiempoDeVuelo * factorInercia
     
-    local ajusteAltura = 0
-    if targetHum and targetHum.HipHeight and targetHum.HipHeight < 1.1 then
-        ajusteAltura = -0.38
-    end
-    
-    local xOffset = gunVelocidadFiltrada.X * multiH * tiempoDeVuelo * factorDistancia * factorDireccion
-    local zOffset = gunVelocidadFiltrada.Z * multiH * tiempoDeVuelo * factorDistancia * factorDireccion
-    
+    -- 4. Predicción Mejorada en Eje Vertical (Salto y Gravedad Calibrados)
     local yOffset = 0
     if targetHum and targetHum.FloorMaterial == Enum.Material.Air then
         if states.JumpPrediction then
-            yOffset = (gunVelocidadFiltrada.Y * tiempoDeVuelo) - (0.5 * 135 * math.pow(tiempoDeVuelo, 2))
-            yOffset = yOffset * multiV * factorDireccion
+            -- Compensación de gravedad amortiguada para evitar caídas absurdas hacia el suelo
+            yOffset = (gunVelocidadFiltrada.Y * tiempoDeVuelo) - (0.5 * 196.2 * math.pow(tiempoDeVuelo, 2) * 0.22)
+            yOffset = yOffset * multiV
         else
-            yOffset = gunVelocidadFiltrada.Y * 0.15 * tiempoDeVuelo * multiV
+            yOffset = gunVelocidadFiltrada.Y * tiempoDeVuelo * 0.35 * multiV
         end
     else
-        yOffset = gunVelocidadFiltrada.Y * multiV * tiempoDeVuelo * factorDireccion
+        -- Micro-suavizado en tierra firme para que los cambios bruscos de altura no rompan el tracking
+        yOffset = gunVelocidadFiltrada.Y * multiV * tiempoDeVuelo * 0.85
     end
-    yOffset = math.clamp(yOffset, -3.8, 3.8)
     
+    -- Límite adaptativo de desfase vertical según la distancia para evitar desvíos extremos
+    local maxVerticalOffset = math.clamp(distancia / 12, 3.5, 5.5)
+    yOffset = math.clamp(yOffset, -maxVerticalOffset, maxVerticalOffset)
+    
+    -- Ajuste milimétrico hacia el centro del torso del avatar
+    local ajusteAltura = 0.15
+    if targetHum and targetHum.HipHeight and targetHum.HipHeight < 1.1 then
+        ajusteAltura = -0.1
+    end
+     
     return targetHRP.Position + Vector3.new(xOffset, yOffset + ajusteAltura, zOffset)
 end
 
@@ -471,14 +464,14 @@ local function dispararAlMurderer()
     local arma = (character and character:FindFirstChild("Gun")) or (backpack and backpack:FindFirstChild("Gun"))
     if arma and humanoid and character:FindFirstChild("HumanoidRootPart") then
         local yaEquipada = (arma.Parent == character)
-        if not yaEquipada then humanoid:EquipTool(arma); task.wait(0.02) end
+         if not yaEquipada then humanoid:EquipTool(arma); task.wait(0.02) end
         if arma:FindFirstChild("Shoot") then
             local originCFrame = character.HumanoidRootPart:FindFirstChild("GunRaycastAttachment") and character.HumanoidRootPart.GunRaycastAttachment.WorldCFrame or character.HumanoidRootPart.CFrame
             
             local targetPos = murdererChar.HumanoidRootPart.Position
             if states.TracerPrediction then
                 local predicted = getGunPredictedPosition(murdererChar)
-                if predicted then targetPos = predicted end
+                 if predicted then targetPos = predicted end
             end
             
             arma.Shoot:FireServer(originCFrame, CFrame.new(targetPos))
@@ -521,7 +514,8 @@ local function getPredictedPosition()
     local horizOffsetX = math.clamp(knifeVelocidadFiltrada.X * pHoriz * timeToTarget * adaptiveDampener, -35, 35)
     local horizOffsetZ = math.clamp(knifeVelocidadFiltrada.Z * pHoriz * timeToTarget * adaptiveDampener, -35, 35)
     
-    local verticalOffset = (targetHum and targetHum.FloorMaterial == Enum.Material.Air) and ((knifeVelocidadFiltrada.Y * timeToTarget) - (0.5 * 196.2 * math.pow(timeToTarget, 2))) or (knifeVelocidadFiltrada.Y * timeToTarget * 0.55)
+    local verticalOffset = (targetHum and targetHum.FloorMaterial == Enum.Material.Air) and ((knifeVelocidadFiltrada.Y * timeToTarget) - (0.5 * 196.2 * math.pow(timeToTarget, 2))) 
+    or (knifeVelocidadFiltrada.Y * timeToTarget * 0.55)
     verticalOffset = math.clamp(verticalOffset * pVert, -12, 22)
     
     local rawPrediction = targetHRP.Position + Vector3.new(horizOffsetX, verticalOffset, horizOffsetZ)
@@ -536,7 +530,7 @@ local function getPredictedPosition()
 end
 
 RunService.RenderStepped:Connect(function()
-    updateFovVisual()
+     updateFovVisual()
     if states.KnifeSilentAim and tieneCuchillo() then
         currentTarget = getClosestTargetInFOV()
         if currentTarget and currentTarget.Character and currentTarget.Character:FindFirstChild("HumanoidRootPart") then
@@ -549,7 +543,7 @@ RunService.RenderStepped:Connect(function()
             KnifeTargetDot.Position = UDim2.new(0, screenPosTarget.X, 0, screenPosTarget.Y)
             KnifeTargetDot.Visible = onScreenTarget and states.KnifeShowTargetDot
             local predictedPos = getPredictedPosition()
-            if predictedPos then
+             if predictedPos then
                 local screenPosPred, onScreenPred = camera:WorldToViewportPoint(predictedPos)
                 KnifePredictionCircle.Position = UDim2.new(0, screenPosPred.X, 0, screenPosPred.Y)
                 KnifePredictionCircle.Visible = onScreenPred and states.KnifeShowPredCircle
@@ -571,7 +565,7 @@ WeaponService.GetMouseTargetCFrame = function(self, ...)
 end
 
 -- ============================================================================
--- HEARTBEAT ENGINE: CONTROLADOR VISUAL OPTIMIZADO Y FIX DE LEAD HUD
+-- HEARTBEAT ENGINE: INTEGRACIÓN ULTRA ESTABLE DE VELOCIDAD
 -- ============================================================================
 RunService.Heartbeat:Connect(function()
     local character = LocalPlayer.Character
@@ -583,11 +577,22 @@ RunService.Heartbeat:Connect(function()
     end
     
     if rolesPartida[LocalPlayer.Name] == "Murderer" or ocultarPorSmartVisibility then 
-         TracerLine.Visible = false; GreenTracer.Visible = false; return 
+        TracerLine.Visible = false; GreenTracer.Visible = false; return 
     end
     
     local murdererChar = buscarMurderer()
     if murdererChar and character and character:FindFirstChild("HumanoidRootPart") then
+        
+        -- 🔥 SISTEMA UNIFICADO ANTI-ZIGZAG CENTRAL: Suaviza la velocidad del Murderer para evitar tirones
+        if not lastGunTarget or lastGunTarget ~= murdererChar then
+            lastGunTarget = murdererChar
+            gunVelocidadFiltrada = murdererChar.HumanoidRootPart.Velocity
+        else
+            local esCambioBrusco = (gunVelocidadFiltrada - murdererChar.HumanoidRootPart.Velocity).Magnitude > 6
+            local lerpFactor = esCambioBrusco and 0.22 or 0.12 -- Amortiguación avanzada
+            gunVelocidadFiltrada = gunVelocidadFiltrada:Lerp(murdererChar.HumanoidRootPart.Velocity, lerpFactor)
+        end
+
         if states.TracerPrediction then
             local predictedPos = getGunPredictedPosition(murdererChar)
             if predictedPos then
@@ -600,37 +605,45 @@ RunService.Heartbeat:Connect(function()
                     TracerLine.Position = UDim2.new(0, inicioTracer.X + vectorDistancia.X / 2, 0, inicioTracer.Y + vectorDistancia.Y / 2)
                     TracerLine.Rotation = math.deg(math.atan2(vectorDistancia.Y, vectorDistancia.X))
                     TracerLine.Visible = true
-                 else TracerLine.Visible = false end
+                else TracerLine.Visible = false end
             else TracerLine.Visible = false end
         else TracerLine.Visible = false end
         
+        -- 🍏 SISTEMA DE LEAD TIME MEJORADO (SUAVE Y ULTRA ESTABLE)
         if states.SeeLeadTime then
             local factorLead = states.LeadTimePrediction or 0.30
             local puntoLeadRaw
             
-             if factorLead == 0 then
+            if factorLead == 0 then
                 puntoLeadRaw = murdererChar.HumanoidRootPart.Position
-                ultimoPosLeadTarget = puntoLeadRaw 
             else
-                puntoLeadRaw = murdererChar.HumanoidRootPart.Position + (murdererChar.HumanoidRootPart.Velocity * (factorLead * 3.5))
-                ultimoPosLeadTarget = ultimoPosLeadTarget:Lerp(puntoLeadRaw, 0.35) 
+                -- Cambiado el multiplicador salvaje de 4.2 a 1.1 + uso obligado de velocidad filtrada
+                puntoLeadRaw = murdererChar.HumanoidRootPart.Position + (gunVelocidadFiltrada * (factorLead * 1.1))
             end
             
+            -- Interpolación cinemática continua para eliminar saltos bruscos en pantalla
+            if ultimoPuntoLead == Vector3.new() then ultimoPuntoLead = puntoLeadRaw end
+            ultimoPuntoLead = ultimoPuntoLead:Lerp(puntoLeadRaw, 0.20)
+            
             local handPos = getHandPosition()
-            if handPos then
+             if handPos then
                 local screenHandPos, handOnScreen = camera:WorldToViewportPoint(handPos)
-                local screenTargetPos, targetOnScreen = camera:WorldToViewportPoint(ultimoPosLeadTarget)
+                local screenTargetPos, targetOnScreen = camera:WorldToViewportPoint(ultimoPuntoLead)
                  if handOnScreen and targetOnScreen then
                     local inicioMano = Vector2.new(screenHandPos.X, screenHandPos.Y)
-                    local vectorMano = Vector2.new(screenTargetPos.X, screenTargetPos.Y) - inicioMano
+                     local vectorMano = Vector2.new(screenTargetPos.X, screenTargetPos.Y) - inicioMano
                     GreenTracer.Size = UDim2.new(0, vectorMano.Magnitude, 0, 1.1)
                     GreenTracer.Position = UDim2.new(0, inicioMano.X + vectorMano.X / 2, 0, inicioMano.Y + vectorMano.Y / 2)
                     GreenTracer.Rotation = math.deg(math.atan2(vectorMano.Y, vectorMano.X))
                     GreenTracer.Visible = true
                 else GreenTracer.Visible = false end
-             else GreenTracer.Visible = false end
+            else GreenTracer.Visible = false end
         else GreenTracer.Visible = false end
-    else TracerLine.Visible = false; GreenTracer.Visible = false end
+    else 
+        TracerLine.Visible = false;
+        GreenTracer.Visible = false 
+        ultimoPuntoLead = Vector3.new() -- Reseteo preventivo del vector de suavizado
+    end
 end)
 
 -- Interfaz física del botón Shoot (Mantiene el renderizado premium satinado)
@@ -711,7 +724,6 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
-print("✅ [KillerHub v2.3] Apartado Extras completamente limpio. Rendimiento optimizado y funciones de Sheriff/Murder al máximo.")
+print("✅ [KillerHub v3.5] Motor balístico y guía visual re-estabilizados.")
 
--- 🔥 RETORNO OBLIGATORIO PARA PODER ENCADENAR MÁS CÓDIGO ABAJO
 return KillerHub
