@@ -1,5 +1,5 @@
 -- ============================================================================
--- 🚀 KILLER HUB - SCRIPT EJECUTOR OPTIMIZADO (VERSION INSTANT RESPONSE V3.7)
+-- 🚀 KILLER HUB - SCRIPT EJECUTOR OPTIMIZADO (LOGICA ANTI-MISS V3.6 PERFECT-AIM)
 -- ============================================================================
 
 -- 1️⃣ Cargar la librería base desde su link oficial
@@ -18,8 +18,8 @@ local states = {
     TracerPrediction = false,
     JumpPrediction = false,         
     TracerSpeed = 0.85,             
-    HorizontalPrediction = 1.00, 
-    VerticalPrediction = 1.00,   
+    HorizontalPrediction = 1.00, -- Por defecto en 100
+    VerticalPrediction = 1.00,   -- Por defecto en 100
     ShowShootButton = false,
     LockButton = false,
     ButtonSize = 100, 
@@ -237,17 +237,6 @@ local lastGunTarget = nil
 local camera = workspace.CurrentCamera
 local currentTarget = nil
 
--- 🔄 Hilo asíncrono para actualización estable de Ping (Cero caídas de FPS)
-local cachePingReal = 0.045
-task.spawn(function()
-    while task.wait(1.5) do
-        pcall(function()
-            local pingVal = Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
-            cachePingReal = math.clamp(pingVal / 1000, 0.015, 0.22)
-        end)
-    end
-end)
-
 if CoreGui:FindFirstChild("KillerHub_OverlayEngine") then
     CoreGui.KillerHub_OverlayEngine:Destroy()
 end
@@ -410,7 +399,7 @@ local function getHandPosition()
 end
 
 -- ============================================================================
--- 🎯 MOTOR DE PREDICCIÓN CON PING ADAPTATIVO ASÍNCRONO (MÁXIMO HITRATE)
+-- 🎯 MOTOR DE PREDICCIÓN REDISEÑADO: HITRATE AL MÁXIMO (ANTI OVER-PREDICTION)
 -- ============================================================================
 local function getGunPredictedPosition(murdererChar)
     if not murdererChar or not murdererChar:FindFirstChild("HumanoidRootPart") then return nil end
@@ -419,16 +408,18 @@ local function getGunPredictedPosition(murdererChar)
     local targetHum = murdererChar:FindFirstChildOfClass("Humanoid")
     if not myHRP or not targetHRP then return nil end
     
-    -- Tiempo de vuelo preciso usando la memoria caché del Ping asíncrono
+    -- 1. Tiempo de vuelo simplificado y directo (Evita stutters del ping en tiempo real)
     local distancia = (myHRP.Position - targetHRP.Position).Magnitude
-    local tiempoDeVuelo = (distancia / 248) + cachePingReal
+    local tiempoDeVuelo = (distancia / 245) + 0.055
     
     local multiH = states.HorizontalPrediction or 1.00
     local multiV = states.VerticalPrediction or 1.00
     
+    -- 2. Predicción Horizontal Imantada (Sin doble factor de inercia que retrase el tiro)
     local xOffset = gunVelocidadFiltrada.X * multiH * tiempoDeVuelo
     local zOffset = gunVelocidadFiltrada.Z * multiH * tiempoDeVuelo
     
+    -- 3. Predicción Vertical Lineal Establecida (Eliminada ecuación de gravedad ruidosa)
     local yOffset = 0
     if targetHum and targetHum.FloorMaterial == Enum.Material.Air then
         if states.JumpPrediction then
@@ -440,8 +431,10 @@ local function getGunPredictedPosition(murdererChar)
         yOffset = gunVelocidadFiltrada.Y * tiempoDeVuelo * multiV * 0.45
     end
     
+    -- Clamp estricto para evitar saltos locos de mira por animaciones glitcheadas
     yOffset = math.clamp(yOffset, -4, 4)
      
+    -- Retorna al centro exacto del HumanoidRootPart sin desfases variables
     return targetHRP.Position + Vector3.new(xOffset, yOffset, zOffset)
 end
 
@@ -482,8 +475,9 @@ local function getPredictedPosition()
     
     local dist = (myHRP.Position - targetHRP.Position).Magnitude
     local pHoriz, pVert = tonumber(states.KnifePredHorizontal) or 1.5, tonumber(states.KnifePredVertical) or 1.0
-    
-    local timeToTarget = (dist / 245) + (cachePingReal * 1.12)
+    local ping = 0.06
+    pcall(function() ping = Stats.Network.ServerStatsItem["Data Ping"]:GetValue() / 1000 end)
+    local timeToTarget = (dist / 245) + (ping * 1.12)
     
     if not lastKnifeTarget or lastKnifeTarget ~= currentTarget then 
         lastKnifeTarget = currentTarget
@@ -554,7 +548,7 @@ WeaponService.GetMouseTargetCFrame = function(self, ...)
 end
 
 -- ============================================================================
--- HEARTBEAT ENGINE: TRACKING CINEMÁTICO INTEGRAL (CON FILTRO ANTI-STRAFE)
+-- HEARTBEAT ENGINE: TRACKING CINEMÁTICO INTEGRAL
 -- ============================================================================
 RunService.Heartbeat:Connect(function()
     local character = LocalPlayer.Character
@@ -572,20 +566,14 @@ RunService.Heartbeat:Connect(function()
     local murdererChar = buscarMurderer()
     if murdererChar and character and character:FindFirstChild("HumanoidRootPart") then
         
-        local currentVelocity = murdererChar.HumanoidRootPart.Velocity
-        
-        -- Filtro Cinemático Anti-Strafe Avanzado
+        -- Filtro Dinámico Base (Frecuencia de actualización limpia)
         if not lastGunTarget or lastGunTarget ~= murdererChar then
             lastGunTarget = murdererChar
-            gunVelocidadFiltrada = currentVelocity
+            gunVelocidadFiltrada = murdererChar.HumanoidRootPart.Velocity
         else
-            -- Si cambian de dirección de golpe (ADAD spam), rompemos la inercia instantáneamente
-            if gunVelocidadFiltrada:Dot(currentVelocity) < 0 then
-                gunVelocidadFiltrada = currentVelocity 
-            else
-                -- Tracking rápido reactivo (Aumentado de 0.12 a 0.28 para acoplamiento inmediato)
-                gunVelocidadFiltrada = gunVelocidadFiltrada:Lerp(currentVelocity, 0.28)
-            end
+            local esCambioBrusco = (gunVelocidadFiltrada - murdererChar.HumanoidRootPart.Velocity).Magnitude > 6
+            local lerpFactor = esCambioBrusco and 0.20 or 0.12
+            gunVelocidadFiltrada = gunVelocidadFiltrada:Lerp(murdererChar.HumanoidRootPart.Velocity, lerpFactor)
         end
 
         if states.TracerPrediction then
@@ -604,7 +592,7 @@ RunService.Heartbeat:Connect(function()
             else TracerLine.Visible = false end
         else TracerLine.Visible = false end
         
-        -- Lead Time Visual de Alta Respuesta (Casi Instantáneo)
+        -- Lead Time Visual Suave
         if states.SeeLeadTime then
             local factorLead = states.LeadTimePrediction or 0.30
             local puntoLeadRaw
@@ -616,8 +604,7 @@ RunService.Heartbeat:Connect(function()
             end
             
             if ultimoPuntoLead == Vector3.new() then ultimoPuntoLead = puntoLeadRaw end
-            -- Incrementado de 0.18 a 0.90 para pegado instantáneo en pantalla
-            ultimoPuntoLead = ultimoPuntoLead:Lerp(puntoLeadRaw, 0.90)
+            ultimoPuntoLead = ultimoPuntoLead:Lerp(puntoLeadRaw, 0.85)
             
             local handPos = getHandPosition()
              if handPos then
@@ -718,6 +705,6 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
-print("✅ [KillerHub] by Paolo 𓂀")
+print("✅ [KillerHub v3.6] Motor balístico optimizado para Máximo Hitrate sin Over-Prediction.")
 
 return KillerHub
