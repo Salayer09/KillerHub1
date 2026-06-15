@@ -1,5 +1,5 @@
 -- ============================================================================
--- 🚀 KILLER HUB - SCRIPT EJECUTOR OPTIMIZADO (LOGICA ANTI-MISS V3.6 PERFECT-AIM)
+-- 🚀 KILLER HUB - SCRIPT EJECUTOR OPTIMIZADO (LOGICA ANTI-MISS V3.7 PERFECT-AIM)
 -- ============================================================================
 
 -- 1️⃣ Cargar la librería base desde su link oficial
@@ -334,7 +334,7 @@ local function buscarMurderer()
     end
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
-             if p.Character:FindFirstChild("Knife") or (p:FindFirstChild("Backpack") and p.Backpack:FindFirstChild("Knife")) then
+            if p.Character:FindFirstChild("Knife") or (p:FindFirstChild("Backpack") and p.Backpack:FindFirstChild("Knife")) then
                 return p.Character
             end
         end
@@ -342,15 +342,23 @@ local function buscarMurderer()
     return nil
 end
 
+-- 🔥 NUEVO WALL CHECK DOBLE ESCANEO
 local function isMurdererVisible(murdererChar)
     if not murdererChar or not murdererChar:FindFirstChild("HumanoidRootPart") or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return false end
+    
     local origin = LocalPlayer.Character.HumanoidRootPart.Position
-    local target = murdererChar.HumanoidRootPart.Position
-    local direction = target - origin
+    local targetHRP = murdererChar.HumanoidRootPart.Position
+    local targetHead = murdererChar:FindFirstChild("Head") and murdererChar.Head.Position or targetHRP
+    
     local raycastParams = RaycastParams.new()
     raycastParams.FilterType = Enum.RaycastFilterType.Exclude
     raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, murdererChar, camera}
-    return Workspace:Raycast(origin, direction, raycastParams) == nil
+    raycastParams.IgnoreWater = true
+    
+    local hrpVisible = Workspace:Raycast(origin, targetHRP - origin, raycastParams) == nil
+    local headVisible = Workspace:Raycast(origin, targetHead - origin, raycastParams) == nil
+    
+    return hrpVisible or headVisible
 end
 
 local function hasLineOfSight(targetChar)
@@ -373,7 +381,7 @@ local function getClosestTargetInFOV()
         if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
             local targetHum = v.Character:FindFirstChildOfClass("Humanoid")
             if targetHum and targetHum.Health > 0 then
-                 local hrp = v.Character.HumanoidRootPart
+                local hrp = v.Character.HumanoidRootPart
                 local screenPos, onScreen = camera:WorldToViewportPoint(hrp.Position)
                 if onScreen then
                     local fovDist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
@@ -399,7 +407,7 @@ local function getHandPosition()
 end
 
 -- ============================================================================
--- 🎯 MOTOR DE PREDICCIÓN REDISEÑADO: HITRATE AL MÁXIMO (ANTI OVER-PREDICTION)
+-- 🎯 MOTOR DE PREDICCIÓN REDISEÑADO: HITRATE AL MÁXIMO (ANTI-ZIGZAG & SPAM JUMPS)
 -- ============================================================================
 local function getGunPredictedPosition(murdererChar)
     if not murdererChar or not murdererChar:FindFirstChild("HumanoidRootPart") then return nil end
@@ -408,34 +416,39 @@ local function getGunPredictedPosition(murdererChar)
     local targetHum = murdererChar:FindFirstChildOfClass("Humanoid")
     if not myHRP or not targetHRP then return nil end
     
-    -- 1. Tiempo de vuelo simplificado y directo (Evita stutters del ping en tiempo real)
-    local distancia = (myHRP.Position - targetHRP.Position).Magnitude
-    local tiempoDeVuelo = (distancia / 245) + 0.055
+    local dist = (myHRP.Position - targetHRP.Position).Magnitude
+    
+    local ping = 0.06
+    pcall(function() ping = Stats.Network.ServerStatsItem["Data Ping"]:GetValue() / 1000 end)
+    local tiempoDeVuelo = (dist / 300) + ping + 0.025
     
     local multiH = states.HorizontalPrediction or 1.00
     local multiV = states.VerticalPrediction or 1.00
     
-    -- 2. Predicción Horizontal Imantada (Sin doble factor de inercia que retrase el tiro)
+    local maxOffsetRadius = 16 
     local xOffset = gunVelocidadFiltrada.X * multiH * tiempoDeVuelo
     local zOffset = gunVelocidadFiltrada.Z * multiH * tiempoDeVuelo
     
-    -- 3. Predicción Vertical Lineal Establecida (Eliminada ecuación de gravedad ruidosa)
+    local horizOffset = Vector3.new(xOffset, 0, zOffset)
+    if horizOffset.Magnitude > maxOffsetRadius then
+        horizOffset = horizOffset.Unit * maxOffsetRadius
+    end
+    
     local yOffset = 0
     if targetHum and targetHum.FloorMaterial == Enum.Material.Air then
         if states.JumpPrediction then
-            yOffset = gunVelocidadFiltrada.Y * tiempoDeVuelo * 0.70 * multiV
+            yOffset = (gunVelocidadFiltrada.Y * tiempoDeVuelo) - (0.5 * 196.2 * math.pow(tiempoDeVuelo, 2))
+            yOffset = yOffset * multiV
         else
             yOffset = gunVelocidadFiltrada.Y * tiempoDeVuelo * 0.25 * multiV
         end
     else
-        yOffset = gunVelocidadFiltrada.Y * tiempoDeVuelo * multiV * 0.45
+        yOffset = gunVelocidadFiltrada.Y * tiempoDeVuelo * multiV * 0.25
     end
     
-    -- Clamp estricto para evitar saltos locos de mira por animaciones glitcheadas
-    yOffset = math.clamp(yOffset, -4, 4)
+    yOffset = math.clamp(yOffset, -12, 10)
      
-    -- Retorna al centro exacto del HumanoidRootPart sin desfases variables
-    return targetHRP.Position + Vector3.new(xOffset, yOffset, zOffset)
+    return targetHRP.Position + Vector3.new(horizOffset.X, yOffset, horizOffset.Z)
 end
 
 local function dispararAlMurderer()
@@ -454,7 +467,7 @@ local function dispararAlMurderer()
             local targetPos = murdererChar.HumanoidRootPart.Position
             if states.TracerPrediction then
                 local predicted = getGunPredictedPosition(murdererChar)
-                 if predicted then targetPos = predicted end
+                if predicted then targetPos = predicted end
             end
             
             arma.Shoot:FireServer(originCFrame, CFrame.new(targetPos))
@@ -513,7 +526,7 @@ local function getPredictedPosition()
 end
 
 RunService.RenderStepped:Connect(function()
-     updateFovVisual()
+    updateFovVisual()
     if states.KnifeSilentAim and tieneCuchillo() then
         currentTarget = getClosestTargetInFOV()
         if currentTarget and currentTarget.Character and currentTarget.Character:FindFirstChild("HumanoidRootPart") then
@@ -526,7 +539,7 @@ RunService.RenderStepped:Connect(function()
             KnifeTargetDot.Position = UDim2.new(0, screenPosTarget.X, 0, screenPosTarget.Y)
             KnifeTargetDot.Visible = onScreenTarget and states.KnifeShowTargetDot
             local predictedPos = getPredictedPosition()
-             if predictedPos then
+            if predictedPos then
                 local screenPosPred, onScreenPred = camera:WorldToViewportPoint(predictedPos)
                 KnifePredictionCircle.Position = UDim2.new(0, screenPosPred.X, 0, screenPosPred.Y)
                 KnifePredictionCircle.Visible = onScreenPred and states.KnifeShowPredCircle
@@ -548,8 +561,11 @@ WeaponService.GetMouseTargetCFrame = function(self, ...)
 end
 
 -- ============================================================================
--- HEARTBEAT ENGINE: TRACKING CINEMÁTICO INTEGRAL
+-- HEARTBEAT ENGINE: TRACKING CINEMÁTICO INTEGRAL & FILTRO ANTI-LAG
 -- ============================================================================
+local lastRealPosGun = Vector3.new()
+local lastRealTimeGun = tick()
+
 RunService.Heartbeat:Connect(function()
     local character = LocalPlayer.Character
     local tieneLaPistola = tienePistola()
@@ -566,14 +582,32 @@ RunService.Heartbeat:Connect(function()
     local murdererChar = buscarMurderer()
     if murdererChar and character and character:FindFirstChild("HumanoidRootPart") then
         
-        -- Filtro Dinámico Base (Frecuencia de actualización limpia)
+        -- Anti-Lag: Calculamos velocidad física real vs velocidad del motor
+        local now = tick()
+        local dt = now - lastRealTimeGun
+        lastRealTimeGun = now
+        
+        local realVelocity = Vector3.new()
+        if dt > 0 then
+            realVelocity = (murdererChar.HumanoidRootPart.Position - lastRealPosGun) / dt
+        end
+        lastRealPosGun = murdererChar.HumanoidRootPart.Position
+
+        local rawVelocity = murdererChar.HumanoidRootPart.Velocity
+        
+        -- Si el motor dice que va rápido pero su posición no cambia (Lag o atascado), forzamos velocidad 0
+        if rawVelocity.Magnitude > 5 and realVelocity.Magnitude < 2 then
+            rawVelocity = Vector3.new(0, rawVelocity.Y, 0)
+        end
+
+        -- Tracking ágil para Zig-Zag
         if not lastGunTarget or lastGunTarget ~= murdererChar then
             lastGunTarget = murdererChar
-            gunVelocidadFiltrada = murdererChar.HumanoidRootPart.Velocity
+            gunVelocidadFiltrada = rawVelocity
         else
-            local esCambioBrusco = (gunVelocidadFiltrada - murdererChar.HumanoidRootPart.Velocity).Magnitude > 6
-            local lerpFactor = esCambioBrusco and 0.20 or 0.12
-            gunVelocidadFiltrada = gunVelocidadFiltrada:Lerp(murdererChar.HumanoidRootPart.Velocity, lerpFactor)
+            local esCambioBrusco = (gunVelocidadFiltrada - rawVelocity).Magnitude > 12
+            local lerpFactor = esCambioBrusco and 0.35 or 0.15 
+            gunVelocidadFiltrada = gunVelocidadFiltrada:Lerp(rawVelocity, lerpFactor)
         end
 
         if states.TracerPrediction then
@@ -607,12 +641,12 @@ RunService.Heartbeat:Connect(function()
             ultimoPuntoLead = ultimoPuntoLead:Lerp(puntoLeadRaw, 0.85)
             
             local handPos = getHandPosition()
-             if handPos then
+            if handPos then
                 local screenHandPos, handOnScreen = camera:WorldToViewportPoint(handPos)
                 local screenTargetPos, targetOnScreen = camera:WorldToViewportPoint(ultimoPuntoLead)
                  if handOnScreen and targetOnScreen then
                     local inicioMano = Vector2.new(screenHandPos.X, screenHandPos.Y)
-                     local vectorMano = Vector2.new(screenTargetPos.X, screenTargetPos.Y) - inicioMano
+                    local vectorMano = Vector2.new(screenTargetPos.X, screenTargetPos.Y) - inicioMano
                     GreenTracer.Size = UDim2.new(0, vectorMano.Magnitude, 0, 1.1)
                     GreenTracer.Position = UDim2.new(0, inicioMano.X + vectorMano.X / 2, 0, inicioMano.Y + vectorMano.Y / 2)
                     GreenTracer.Rotation = math.deg(math.atan2(vectorMano.Y, vectorMano.X))
@@ -621,8 +655,7 @@ RunService.Heartbeat:Connect(function()
             else GreenTracer.Visible = false end
         else GreenTracer.Visible = false end
     else 
-        TracerLine.Visible = false;
-        GreenTracer.Visible = false 
+        TracerLine.Visible = false; GreenTracer.Visible = false 
         ultimoPuntoLead = Vector3.new()
     end
 end)
@@ -705,6 +738,6 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
-print("✅ [KillerHub v3.6] Motor balístico optimizado para Máximo Hitrate sin Over-Prediction.")
+print("✅ [KillerHub v3.7] Motor balístico Anti-Lag con escaneo doble integrado al 100%.")
 
 return KillerHub
