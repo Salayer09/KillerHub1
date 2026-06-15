@@ -362,18 +362,21 @@ local function isMurdererVisible(murdererChar)
     
     globalRaycastParams.FilterDescendantsInstances = {LocalPlayer.Character, murdererChar, camera}
     
+    local hrpPos = murdererChar.HumanoidRootPart.Position
     local puntosEscanear = {
-        murdererChar.HumanoidRootPart.Position,
+        hrpPos,
         murdererChar:FindFirstChild("Head") and murdererChar.Head.Position,
+        hrpPos + Vector3.new(1.8, 0, 0),  
+        hrpPos + Vector3.new(-1.8, 0, 0), 
         murdererChar:FindFirstChild("LeftFoot") and murdererChar.LeftFoot.Position,
         murdererChar:FindFirstChild("RightFoot") and murdererChar.RightFoot.Position
     }
     
     for _, puntoDestino in pairs(puntosEscanear) do
         if puntoDestino then
-            local resultadoRay = Workspace:Raycast(origin, puntoDestino - origin, globalRaycastParams)
+            local resultadoRay = workspace:Raycast(origin, puntoDestino - origin, globalRaycastParams)
             if not resultadoRay then
-                return true
+                return true 
             end
         end
     end
@@ -439,57 +442,70 @@ local function getGunPredictedPosition(murdererChar)
     local dist = (myHRP.Position - targetHRP.Position).Magnitude
     local ping = cachedPing or 0.125
     
-    local tiempoDeVuelo = (dist / 310) + (ping * 1.12)
+    local bulletSpeed = 310
+    local tiempoDeVuelo = (dist / bulletSpeed) + ping
     
     local multiH = states.HorizontalPrediction or 1.00
     local multiV = states.VerticalPrediction or 1.00
     
-    local rangeMultiplier = 1.0
-    local accelerationWeight = 1.0
+    local velocidadActual = gunVelocidadFiltrada or Vector3.new()
+    local dirAceleracion = gunAceleracionFiltrada or Vector3.new()
     
-    if dist < 14 then
-        rangeMultiplier = math.clamp(dist / 14, 0.05, 0.40)
-        accelerationWeight = 0.0
-    elseif dist >= 14 and dist < 38 then
-        rangeMultiplier = 1.02
-        accelerationWeight = 0.50
+    if velocidadActual.Magnitude < 1.2 then
+        return targetHRP.Position
+    end
+    
+    local rangeMultiplier = 1.0
+    if dist < 9 then
+        rangeMultiplier = 0.12 
+    elseif dist < 22 then
+        rangeMultiplier = 0.60 
+    elseif dist < 50 then
+        rangeMultiplier = 1.00 
     else
-        rangeMultiplier = 1.30
-        accelerationWeight = 0.65
-        
-        if gunVelocidadFiltrada.Magnitude > 0.1 then
-            local desaceleracionBrusca = gunAceleracionFiltrada.Magnitude
-            if desaceleracionBrusca > 15 then
-                rangeMultiplier = rangeMultiplier * math.clamp(20 / desaceleracionBrusca, 0.45, 1.0)
-            end
+        rangeMultiplier = 0.80 
+    end
+    
+    -- Protección Anti-NaN: Solo calcula el Dot Product si ambos vectores tienen dirección válida
+    if velocidadActual.Magnitude > 0 and dirAceleracion.Magnitude > 0 then
+        local dotCheck = velocidadActual.Unit:Dot(dirAceleracion.Unit)
+        if dirAceleracion.Magnitude > 8 and dotCheck < -0.15 then
+            rangeMultiplier = rangeMultiplier * 0.35 
         end
     end
     
     local tSq = tiempoDeVuelo * tiempoDeVuelo
-    local xOffset = (gunVelocidadFiltrada.X * tiempoDeVuelo) + (0.5 * gunAceleracionFiltrada.X * tSq * accelerationWeight)
-    local zOffset = (gunVelocidadFiltrada.Z * tiempoDeVuelo) + (0.5 * gunAceleracionFiltrada.Z * tSq * accelerationWeight)
+    local xOffset = velocidadActual.X * tiempoDeVuelo
+    local zOffset = velocidadActual.Z * tiempoDeVuelo
+    
+    if dist < 55 and dirAceleracion.Magnitude < 45 then
+        xOffset = xOffset + (0.5 * dirAceleracion.X * tSq)
+        zOffset = zOffset + (0.5 * dirAceleracion.Z * tSq)
+    end
     
     local horizOffset = Vector3.new(xOffset, 0, zOffset) * multiH * rangeMultiplier
     
-    local maxOffsetRadius = math.clamp(dist * 0.5, 2.0, 20)
-    if horizOffset.Magnitude > maxOffsetRadius then
-        horizOffset = horizOffset.Unit * maxOffsetRadius
+    local maxCap = math.clamp(dist * 0.22, 1.2, 10.5)
+    if horizOffset.Magnitude > maxCap then
+        horizOffset = horizOffset.Unit * maxCap
     end
     
     local yOffset = 0
+    local gravedadActual = workspace.Gravity
+    
     if targetHum and targetHum.FloorMaterial == Enum.Material.Air then
         if states.JumpPrediction then
-            yOffset = (gunVelocidadFiltrada.Y * tiempoDeVuelo) - (0.5 * 196.2 * tSq)
+            yOffset = (velocidadActual.Y * tiempoDeVuelo) - (0.5 * gravedadActual * tSq)
             yOffset = yOffset * multiV * rangeMultiplier
         else
-            yOffset = gunVelocidadFiltrada.Y * tiempoDeVuelo * 0.35 * multiV * rangeMultiplier
+            yOffset = velocidadActual.Y * tiempoDeVuelo * 0.25 * multiV * rangeMultiplier
         end
     else
-        yOffset = gunVelocidadFiltrada.Y * tiempoDeVuelo * multiV * 0.15 * rangeMultiplier
+        yOffset = velocidadActual.Y * tiempoDeVuelo * 0.05 * multiV
     end
     
-    yOffset = math.clamp(yOffset, -8, 10)
-     
+    yOffset = math.clamp(yOffset, -4.5, 6.5)
+    
     return targetHRP.Position + Vector3.new(horizOffset.X, yOffset, horizOffset.Z)
 end
 
@@ -612,7 +628,7 @@ WeaponService.GetMouseTargetCFrame = function(self, ...)
 end
 
 -- ============================================================================
--- HEARTBEAT ENGINE: TRACKING CINEMÁTICO INTEGRAL & FILTRO ANTI-LAG
+-- HEARTBEAT ENGINE: TRACKING CINEMÁTICO INTEGRAL & FILTRO ANTI-LAG (CORREGIDO)
 -- ============================================================================
 local lastRealPosGun = Vector3.new()
 
@@ -646,6 +662,7 @@ RunService.Heartbeat:Connect(function(dt)
 
         if not lastGunTarget or lastGunTarget ~= murdererChar then
             lastGunTarget = murdererChar
+            lastRealPosGun = murdererChar.HumanoidRootPart.Position -- 🌟 Corrección aplicada para evitar saltos de predicción
             gunVelocidadFiltrada = rawVelocity
             gunAceleracionFiltrada = Vector3.new()
         else
@@ -766,19 +783,24 @@ ShootButton.InputBegan:Connect(function(input)
     if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
         shootDraggingInput = input
         shootDragStart = input.Position
-        shootStartPos = ShootButton.Position; haSidoArrastrado = false
-        tickInicioPresion = os.clock() -- Registrar tiempo exacto del Clic
+        shootStartPos = ShootButton.Position
+        haSidoArrastrado = false
+        tickInicioPresion = os.clock()
+        
         TweenService:Create(ShootButton, tweenInfoGlow, {BackgroundColor3 = COLOR_VOID_GLOW}):Play()
         TweenService:Create(ShootStroke, tweenInfoGlow, {Color = COLOR_STROKE_GLOW, Thickness = 1.6}):Play()
+        
+        dispararAlMurderer()
     end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
     if input == shootDraggingInput and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - shootDragStart
-        -- Aumento de zona muerta a 18px para mitigar falsos arrastres táctiles en móviles
-        if delta.Magnitude > 18 then haSidoArrastrado = true end
-        if not states.LockButton then ShootButton.Position = UDim2.new(shootStartPos.X.Scale, shootStartPos.X.Offset + delta.X, shootStartPos.Y.Scale, shootStartPos.Y.Offset + delta.Y) end
+        if delta.Magnitude > 22 then haSidoArrastrado = true end
+        if not states.LockButton then 
+            ShootButton.Position = UDim2.new(shootStartPos.X.Scale, shootStartPos.X.Offset + delta.X, shootStartPos.Y.Scale, shootStartPos.Y.Offset + delta.Y) 
+        end
     end
 end)
 
@@ -788,11 +810,7 @@ UserInputService.InputEnded:Connect(function(input)
         TweenService:Create(ShootButton, tweenInfoGlow, {BackgroundColor3 = COLOR_VOID_BASE}):Play()
         TweenService:Create(ShootStroke, tweenInfoGlow, {Color = COLOR_STROKE_BASE, Thickness = 1.2}):Play()
         
-        -- Cláusula bypass: Si fue un toque ultra veloz (< 0.15s), forzar el disparo sin importar pequeños temblores físicos
-        local duracionToque = os.clock() - tickInicioPresion
-        if not haSidoArrastrado or duracionToque < 0.15 then
-            dispararAlMurderer()
-        else
+        if haSidoArrastrado then
             states.ButtonScaleX = ShootButton.Position.X.Scale
             states.ButtonOffsetX = ShootButton.Position.X.Offset
             states.ButtonScaleY = ShootButton.Position.Y.Scale
