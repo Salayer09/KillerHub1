@@ -11,7 +11,7 @@ if _G.KillerHubInstance then
     KillerHub = _G.KillerHubInstance
 else
     -- Si no existe, realiza la descarga limpia de la UI Library oficial actualizada
-    KillerHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/Salayer09/KillerHub1/refs/heads/main/MM2.lua"))()
+    KillerHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/Salayer09/Killer-Hub-test/main/Test.lua"))()
     _G.KillerHubInstance = KillerHub -- Registra la instancia de forma global
 end
 
