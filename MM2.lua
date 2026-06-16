@@ -1,8 +1,8 @@
 -- ============================================================================
--- 🚀 KILLER HUB - SCRIPT EJECUTOR (VERSIÓN V6.6 - COLOR PICKER RESTAURADO)
+-- 🚀 KILLER HUB - SCRIPT EJECUTOR (VERSIÓN V6.6 - ADAPTADO AL NUEVO FRAMEWORK)
 -- ============================================================================
 
-local KillerHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/Salayer09/Killer-Hub-test/main/Test.lua"))()
+local KillerHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/Salayer09/KillerHub1/refs/heads/main/MM2.lua"))()
 
 local Visuals  = KillerHub.Tabs.Visuals
 local Murder   = KillerHub.Tabs.Murder
@@ -189,7 +189,7 @@ local function getHandPosition()
 end
 
 -- ============================================================================
--- 🧱 INTERFAZ NATIVA
+-- 🧱 INTERFAZ NATIVA (ADAPTADA AL NUEVO FRAMEWORK)
 -- ============================================================================
 Sheriff:CreateSection("Target Prediction")
 Sheriff:CreateToggle("S_GunSilentAim", "Gun Silent Aim (Clicks)", function(state) states.GunSilentAim = state saveButtonConfig() end)
@@ -228,7 +228,7 @@ Murder:CreateSlider("M_PredVert", "Intensidad Pred. Vertical", 0, 320, function(
 Murder:CreateSection("Configuración Visual Knife FOV")
 Murder:CreateToggle("M_ShowFovCircle", "Mostrar Círculo FOV", function(state) states.KnifeShowFov = state saveButtonConfig() end)
 
--- 🎨 [COLOR PICKER INTEGRADO CON LA API]
+-- 🎨 [COLOR PICKER INTEGRADO EN EL RECTOR]
 Murder:CreateColorPicker("M_KnifeFovColor", "Color del Círculo FOV", Color3.fromRGB(states.KnifeFovR, states.KnifeFovG, states.KnifeFovB), function(colorElegido)
     states.KnifeFovR = math.round(colorElegido.R * 255)
     states.KnifeFovG = math.round(colorElegido.G * 255)
@@ -244,7 +244,7 @@ Settings:CreateSection("Configuración del Framework")
 Settings:CreateKeybind("MenuToggle", "Tecla para Ocultar Hub", Enum.KeyCode.RightControl, function(key) end)
 
 -- ============================================================================
--- 🎯 LÓGICA DE PROCESAMIENTO
+-- 🎯 LÓGICA DE PROCESAMIENTO (CONSERVADA TOTALMENTE AL 100% SIN CAMBIOS)
 -- ============================================================================
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -358,9 +358,6 @@ local function getClosestTargetInFOV()
     return near
 end
 
--- ============================================================================
--- 🧠 MOTOR GENERAL DE ESCANEO DE HUESOS ADAPTATIVO
--- ============================================================================
 local function obtenerParteVisible(targetChar)
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then 
         return targetChar:FindFirstChild("HumanoidRootPart") 
@@ -383,9 +380,6 @@ local function obtenerParteVisible(targetChar)
     return targetChar:FindFirstChild("HumanoidRootPart")
 end
 
--- ============================================================================
--- 🧠 MOTOR PISTOLA (CON PARCHE ANTI-AVATARES ENANOS)
--- ============================================================================
 local function getGunPredictedPosition(murdererChar)
     if not murdererChar or not murdererChar:FindFirstChild("HumanoidRootPart") then return nil end
     local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -481,9 +475,6 @@ local function getGunPredictedPosition(murdererChar)
     return finalPos
 end
 
--- ============================================================================
--- 🧠 MOTOR CUCHILLO
--- ============================================================================
 local function getPredictedPosition()
     if not currentTarget or not currentTarget.Character or not currentTarget.Character:FindFirstChild("HumanoidRootPart") then return nil end
     local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -576,9 +567,6 @@ local function getPredictedPosition()
     return destinoPred
 end
 
--- ============================================================================
--- 🧱 RECTOR DE DISPARO INTERNO (BOTÓN SHOOT)
--- ============================================================================
 local function dispararAlMurderer()
     local murdererChar = buscarMurderer()
     if not murdererChar or not murdererChar:FindFirstChild("HumanoidRootPart") then return end
@@ -642,7 +630,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ============================================================================
--- 🔗 METAMÉTODO NATIVO (REDIRECCIÓN POR SILENT AIM)
+-- 🔗 METAMÉTODOS DEL FILTRO DE INTERCEPCIÓN COORDENADA (SILENT AIM DETOURS)
 -- ============================================================================
 local WeaponService = require(ReplicatedStorage:WaitForChild("ClientServices"):WaitForChild("WeaponService"))
 local oldGetTargetPosition = WeaponService.GetTargetPosition
@@ -757,7 +745,7 @@ RunService.Heartbeat:Connect(function(dt)
     else TracerLine.Visible = false; GreenTracer.Visible = false end
 end)
 
--- UI Botón Físico Shoot
+-- UI Botón Físico Shoot (Render Mobile Overlay Integrado)
 ShootButton = Instance.new("TextButton", OverlayGui)
 ShootButton.Size = UDim2.new(0, states.ButtonSize, 0, states.ButtonSize)
 ShootButton.Position = UDim2.new(states.ButtonScaleX, states.ButtonOffsetX, states.ButtonScaleY, states.ButtonOffsetY)
