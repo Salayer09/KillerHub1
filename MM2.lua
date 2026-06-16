@@ -1,5 +1,5 @@
 -- ============================================================================
--- 🚀 KILLER HUB - SCRIPT EJECUTOR (VERSIÓN V6.0 ULTRA SILENT AIM & INTEL)
+-- 🚀 KILLER HUB - SCRIPT EJECUTOR (VERSIÓN V6.5 ANTI-MINI AVATARS & GOD AIM)
 -- ============================================================================
 
 local KillerHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/Salayer09/Killer-Hub-test/main/Test.lua"))()
@@ -253,7 +253,7 @@ local knifeVelocityBuffer = {}
 local gunVelocidadFiltrada = Vector3.new()
 local gunAceleracionFiltrada = Vector3.new()
 local knifeVelocidadFiltrada = Vector3.new()
-local lastVelHorizontalBase = Vector3.new() -- Guarda memoria del frame anterior para Anti-Zigzag
+local lastVelHorizontalBase = Vector3.new() 
 local camera = workspace.CurrentCamera
 local currentTarget = nil
 
@@ -319,21 +319,6 @@ local globalRaycastParams = RaycastParams.new()
 globalRaycastParams.FilterType = Enum.RaycastFilterType.Exclude
 globalRaycastParams.IgnoreWater = true
 
-local function isMurdererVisible(murdererChar)
-    if not murdererChar or not murdererChar:FindFirstChild("HumanoidRootPart") or not LocalPlayer.Character then return false end
-    local origin = getHandPosition() or LocalPlayer.Character.HumanoidRootPart.Position
-    globalRaycastParams.FilterDescendantsInstances = {LocalPlayer.Character, murdererChar, camera}
-    local hrpPos = murdererChar.HumanoidRootPart.Position
-    local puntosEscanear = {hrpPos, murdererChar:FindFirstChild("Head") and murdererChar.Head.Position}
-    for _, puntoDestino in pairs(puntosEscanear) do
-        if puntoDestino then
-            local resultadoRay = workspace:Raycast(origin, puntoDestino - origin, globalRaycastParams)
-            if not resultadoRay then return true end
-        end
-    end
-    return false
-end
-
 local function hasLineOfSight(targetChar)
     if not states.KnifeWallCheck then return true end
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return false end
@@ -365,7 +350,7 @@ local function getClosestTargetInFOV()
 end
 
 -- ============================================================================
--- 🧠 MOTOR DE PREDICCIÓN AVANZADO REFACTORIZADO (V6.0 GOD MODE)
+-- 🧠 MOTOR GENERAL DE ESCANEO DE HUESOS ADAPTATIVO
 -- ============================================================================
 local function obtenerParteVisible(targetChar)
     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then 
@@ -374,7 +359,6 @@ local function obtenerParteVisible(targetChar)
     globalRaycastParams.FilterDescendantsInstances = {LocalPlayer.Character, targetChar, camera}
     local origin = LocalPlayer.Character.HumanoidRootPart.Position
     
-    -- [MEJORA: Escaneo de Extremidades Adaptativo]
     if targetChar:FindFirstChild("HumanoidRootPart") and not workspace:Raycast(origin, targetChar.HumanoidRootPart.Position - origin, globalRaycastParams) then
         return targetChar.HumanoidRootPart
     end
@@ -390,20 +374,34 @@ local function obtenerParteVisible(targetChar)
     return targetChar:FindFirstChild("HumanoidRootPart")
 end
 
+-- ============================================================================
+-- 🧠 MOTOR PISTOLA (CON PARCHE ANTI-AVATARES ENANOS)
+-- ============================================================================
 local function getGunPredictedPosition(murdererChar)
     if not murdererChar or not murdererChar:FindFirstChild("HumanoidRootPart") then return nil end
     local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    local targetHRP = murdererChar.HumanoidRootPart
-    local targetHum = murdererChar:FindFirstChildOfClass("Humanoid")
-    if not myHRP or not targetHRP then return nil end
     
-    local dist = (myHRP.Position - targetHRP.Position).Magnitude
+    -- 🛠️ Redirigir al hueso visible en vez de fijar ciegamente el HRP desalineado
+    local targetPart = obtenerParteVisible(murdererChar) or murdererChar.HumanoidRootPart
+    local targetHum = murdererChar:FindFirstChildOfClass("Humanoid")
+    if not myHRP or not targetPart then return nil end
+    
+    local dist = (myHRP.Position - targetPart.Position).Magnitude
     local ping = cachedPing or 0.125
     local bulletSpeed = 310
     local tiempoDeVuelo = (dist / bulletSpeed) + ping
     
     local multiH = states.HorizontalPrediction or 1.00
     local multiV = states.VerticalPrediction or 1.00
+    
+    -- 👾 [DETECTOR DE ESCALA DE AVATAR CUSTOM]
+    local avatarScale = 1
+    if targetHum then
+        local heightScale = targetHum:FindFirstChild("HeightScale")
+        if heightScale then
+            avatarScale = math.clamp(heightScale.Value, 0.3, 1) -- Detecta si mide menos del 100%
+        end
+    end
     
     if states.PingAdaptation then
         local pingEnMs = ping * 1000
@@ -421,16 +419,22 @@ local function getGunPredictedPosition(murdererChar)
         rangeMultiplier = math.max(0.85, 1.00 - ((dist - 50) * 0.003))
     end
     
-    if gunVelocidadFiltrada.Magnitude < 1.0 then return targetHRP.Position end
+    if gunVelocidadFiltrada.Magnitude < 1.0 then 
+        -- Si está quieto y es enano, bajamos el punto un poco para impactar centro de masa real
+        if avatarScale < 0.75 and targetPart.Name == "HumanoidRootPart" then
+            return targetPart.Position - Vector3.new(0, 0.5 * (1 - avatarScale), 0)
+        end
+        return targetPart.Position 
+    end
     
-    local dirToMe = (myHRP.Position - targetHRP.Position).Unit
+    local dirToMe = (myHRP.Position - targetPart.Position).Unit
     local dot = gunVelocidadFiltrada.Unit:Dot(dirToMe)
     if dot > 0.25 then
         local threatFactor = 1 + (dot * 0.35)
         multiH = multiH * threatFactor
     end
     
-    local posSimulada = targetHRP.Position
+    local posSimulada = targetPart.Position
     local velSimulada = gunVelocidadFiltrada * multiH * rangeMultiplier
     local totalSteps = states.SimDivider or 4
     local stepTime = tiempoDeVuelo / totalSteps
@@ -438,7 +442,7 @@ local function getGunPredictedPosition(murdererChar)
     local environmentParams = RaycastParams.new()
     environmentParams.FilterType = Enum.RaycastFilterType.Exclude
     environmentParams.FilterDescendantsInstances = {murdererChar, LocalPlayer.Character}
-    local ceilingRay = workspace:Raycast(targetHRP.Position, Vector3.new(0, 13, 0), environmentParams)
+    local ceilingRay = workspace:Raycast(targetPart.Position, Vector3.new(0, 13, 0), environmentParams)
     local hasLowCeiling = ceilingRay ~= nil
     
     for i = 1, totalSteps do
@@ -457,12 +461,25 @@ local function getGunPredictedPosition(murdererChar)
                 yOffset = yOffset * multiV * rangeMultiplier
             end
         else yOffset = gunVelocidadFiltrada.Y * tiempoDeVuelo * 0.20 * multiV end
-    else yOffset = gunVelocidadFiltrada.Y * tiempoDeVuelo * 0.05 * multiV end
+    else 
+        -- 🛠️ Forzar 0 en suelo firme para evitar que la física de piernas cortas levante el tiro falso
+        yOffset = 0 
+    end
     
     yOffset = math.clamp(yOffset, -4.0, 6.0)
-    return Vector3.new(posSimulada.X, posSimulada.Y + yOffset, posSimulada.Z)
+    local finalPos = Vector3.new(posSimulada.X, posSimulada.Y + yOffset, posSimulada.Z)
+    
+    -- Compensación de altura final basada en el tamaño real detectado de la comunidad
+    if avatarScale < 0.75 and targetPart.Name == "HumanoidRootPart" then
+        finalPos = finalPos - Vector3.new(0, 0.6 * (1 - avatarScale), 0)
+    end
+    
+    return finalPos
 end
 
+-- ============================================================================
+-- 🧠 MOTOR CUCHILLO
+-- ============================================================================
 local function getPredictedPosition()
     if not currentTarget or not currentTarget.Character or not currentTarget.Character:FindFirstChild("HumanoidRootPart") then return nil end
     local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -470,14 +487,12 @@ local function getPredictedPosition()
     local targetHum = currentTarget.Character:FindFirstChildOfClass("Humanoid")
     if not myHRP or not targetHRP then return nil end
     
-    -- Mejora 3: Apuntar al hueso visible (HRP, Cabeza o Piernas)
     local targetPart = obtenerParteVisible(currentTarget.Character) or targetHRP
     local dist = (myHRP.Position - targetPart.Position).Magnitude
     
     local pHoriz, pVert = tonumber(states.KnifePredHorizontal) or 1.5, tonumber(states.KnifePredVertical) or 1.0
     local ping = cachedPing or 0.06
     
-    -- Mejora 4: Compensación por Caída de Distancia Dinámica (* 1.05)
     local timeToTarget = (dist / 245) * 1.05 + (ping * 1.12)
     
     if states.PingAdaptation then
@@ -488,16 +503,12 @@ local function getPredictedPosition()
         end
     end
     
-    -- 🛡️ [ESCUDO ANTI-LAG HORIZONTAL]
     local rawVelocity = targetHRP.Velocity
-    
-    -- 1. Capar picos de lag por velocidad absurda
     local maxSafeSpeed = 26
     if rawVelocity.Magnitude > maxSafeSpeed then
         rawVelocity = rawVelocity.Unit * maxSafeSpeed
     end
     
-    -- 2. Suavizado Lerp entre frames
     if #knifeVelocityBuffer > 0 then
         local lastVel = knifeVelocityBuffer[#knifeVelocityBuffer]
         rawVelocity = lastVel:Lerp(rawVelocity, 0.25)
@@ -513,16 +524,14 @@ local function getPredictedPosition()
     local velHorizontal = Vector3.new(knifeVelocidadFiltrada.X, 0, knifeVelocidadFiltrada.Z)
     local magH = velHorizontal.Magnitude
     
-    -- Mejora 2: Detección de Aceleración Inversa (Anti-Zigzag / Strafing)
     if lastVelHorizontalBase.Magnitude > 0 and magH > 0 then
         local direccionDot = lastVelHorizontalBase.Unit:Dot(velHorizontal.Unit)
         if direccionDot < 0.2 then
-            pHoriz = pHoriz * 0.35 -- Reduce predicción si cambia bruscamente de lado
+            pHoriz = pHoriz * 0.35 
         end
     end
     lastVelHorizontalBase = velHorizontal
     
-    -- 3. Zona Muerta Estricta (Anti-Microstutter)
     local adaptiveDampener = 1
     if magH < 2 then
         adaptiveDampener = 0 
@@ -533,7 +542,6 @@ local function getPredictedPosition()
     local horizOffsetX = math.clamp(knifeVelocidadFiltrada.X * pHoriz * timeToTarget * adaptiveDampener, -35, 35)
     local horizOffsetZ = math.clamp(knifeVelocidadFiltrada.Z * pHoriz * timeToTarget * adaptiveDampener, -35, 35)
     
-    -- 🛠️ [SISTEMA VERTICAL ANTISUELO CORREGIDO]
     local verticalOffset = 0
     local deVerdadEstaEnElAire = (targetHum and targetHum.FloorMaterial == Enum.Material.Air) or (math.abs(knifeVelocidadFiltrada.Y) > 3.5)
     
@@ -548,11 +556,8 @@ local function getPredictedPosition()
     end
     
     local finalVertical = math.clamp(verticalOffset * pVert, -1.8, 12)
-    
-    -- Posición destino base calculada
     local destinoPred = targetPart.Position + Vector3.new(horizOffsetX, finalVertical, horizOffsetZ)
     
-    -- Mejora 1: Filtro Oclusión de Esquinas (Anti-Wall Clip)
     if states.KnifeWallCheck then
         local wallPathParams = RaycastParams.new()
         wallPathParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -560,7 +565,6 @@ local function getPredictedPosition()
         
         local golpePared = workspace:Raycast(targetPart.Position, destinoPred - targetPart.Position, wallPathParams)
         if golpePared then
-            -- Ajusta la bolita al ras de la pared restando una milésima de vector unitario
             destinoPred = golpePared.Position - (magH > 0 and velHorizontal.Unit * 0.4 or Vector3.new())
         end
     end
@@ -830,4 +834,5 @@ print([[
                                                            
 
 ]])
+
 return KillerHub
