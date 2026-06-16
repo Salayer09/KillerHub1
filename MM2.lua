@@ -1,5 +1,5 @@
 -- ============================================================================
--- 🚀 KILLER HUB - SCRIPT EJECUTOR (VERSIÓN V5.5 NEURAL PING ADAPTIVE - OPTIMIZED)
+-- 🚀 KILLER HUB - SCRIPT EJECUTOR (VERSIÓN V5.5 SUPREME SILENT AIM & INTEL)
 -- ============================================================================
 
 local KillerHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/Salayer09/Killer-Hub-test/main/Test.lua"))()
@@ -30,8 +30,8 @@ local states = {
     SimDivider = 4,       
     PredInterval = 5,     
     
-    -- 🧠 NUEVO: Sistema de Adaptación de Ping Inteligente
-    PingAdaptation = false, -- Controla si el script compensa el lag por sí solo
+    -- 🧠 Sistema de Adaptación de Ping Inteligente
+    PingAdaptation = false, 
     
     -- UI Botón
     ButtonScaleX = 0.80,
@@ -182,7 +182,7 @@ local function getHandPosition()
 end
 
 -- ============================================================================
--- 🧱 CONSTRUCCIÓN DE LA INTERFAZ DE USUARIO (CON BOTÓN DE ADAPTACIÓN)
+-- 🧱 INTERFAZ NATIVA
 -- ============================================================================
 Sheriff:CreateSection("Target Prediction")
 Sheriff:CreateToggle("S_TracerPrediction", "Show Tracer Guide", function(state) states.TracerPrediction = state saveButtonConfig() end)
@@ -192,26 +192,17 @@ Sheriff:CreateSlider("S_HorizontalPred", "Horizontal Tuning", 0, 150, function(v
 Sheriff:CreateSlider("S_VerticalPred", "Vertical Tuning", 0, 125, function(val) states.VerticalPrediction = val / 100 saveButtonConfig() end)
 
 Sheriff:CreateSection("Advanced Prediction")
-Sheriff:CreateToggle("S_PingAdaptation", "Dynamic Ping Adaptation", function(state) 
-    states.PingAdaptation = state 
-    saveButtonConfig() 
-end)
-Sheriff:CreateSlider("S_SimDivider", "Simulation Divider (Steps)", 1, 8, function(val) 
-    states.SimDivider = math.clamp(math.round(val), 1, 8)
-    saveButtonConfig() 
-end)
-Sheriff:CreateSlider("S_PredInterval", "Prediction Interval (Buffer)", 2, 10, function(val) 
-    states.PredInterval = math.clamp(math.round(val), 2, 10)
-    saveButtonConfig() 
-end)
+Sheriff:CreateToggle("S_PingAdaptation", "Dynamic Ping Adaptation", function(state) states.PingAdaptation = state saveButtonConfig() end)
+Sheriff:CreateSlider("S_SimDivider", "Simulation Divider (Steps)", 1, 8, function(val) states.SimDivider = math.clamp(math.round(val), 1, 8) saveButtonConfig() end)
+Sheriff:CreateSlider("S_PredInterval", "Prediction Interval (Buffer)", 2, 10, function(val) states.PredInterval = math.clamp(math.round(val), 2, 10) saveButtonConfig() end)
 
 Sheriff:CreateSection("Combat Filters")
 Sheriff:CreateToggle("S_WallCheck", "Strict Wall Check", function(state) states.WallCheck = state saveButtonConfig() end)
 Sheriff:CreateToggle("S_SeeLeadTime", "See Lead Time", function(state) states.SeeLeadTime = state saveButtonConfig() end)
 Sheriff:CreateSlider("S_LeadTimePred", "Lead Multiplier", 0, 100, function(val) states.LeadTimePrediction = val / 100 saveButtonConfig() end)
 
-Sheriff:CreateSection("Button Settings")
-Sheriff:CreateToggle("S_ShowShootButton", "Show Button", function(state) states.ShowShootButton = state if ShootButton then ShootButton.Visible = state end saveButtonConfig() end)
+Sheriff:CreateSection("Legacy Settings")
+Sheriff:CreateToggle("S_ShowShootButton", "Show Screen Button", function(state) states.ShowShootButton = state if ShootButton then ShootButton.Visible = state end saveButtonConfig() end)
 Sheriff:CreateToggle("S_SmartVisibility", "Smart Visibility", function(state) states.SmartVisibility = state saveButtonConfig() end)
 Sheriff:CreateToggle("S_LockButton", "Lock Position", function(state) states.LockButton = state saveButtonConfig() end)
 Sheriff:CreateSlider("S_ButtonSize", "Button Size", 50, 180, function(val) states.ButtonSize = val if ShootButton then ShootButton.Size = UDim2.new(0, val, 0, val) end saveButtonConfig() end)
@@ -236,7 +227,7 @@ Settings:CreateSection("Configuración del Framework")
 Settings:CreateKeybind("MenuToggle", "Tecla para Ocultar Hub", Enum.KeyCode.RightControl, function(key) end)
 
 -- ============================================================================
--- 🎯 LÓGICA DE DETECCIÓN Y PROCESAMIENTO
+-- 🎯 LÓGICA DE PROCESAMIENTO
 -- ============================================================================
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -364,6 +355,9 @@ local function getClosestTargetInFOV()
     return near
 end
 
+-- ============================================================================
+-- 🧠 MOTOR DE PREDICCIÓN AVANZADO (INTERPOLACIÓN & THREAT ASSESSMENT INTEGRADO)
+-- ============================================================================
 local function getGunPredictedPosition(murdererChar)
     if not murdererChar or not murdererChar:FindFirstChild("HumanoidRootPart") then return nil end
     local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -388,10 +382,24 @@ local function getGunPredictedPosition(murdererChar)
         end
     end
     
+    -- 📉 MEJORA 1: Suavizado de Curva de Rango (Smooth Range Interpolation)
+    local rangeMultiplier = 1.0
+    if dist < 50 then
+        rangeMultiplier = 0.10 + (0.90 * (dist / 50))
+    else
+        rangeMultiplier = math.max(0.85, 1.00 - ((dist - 50) * 0.003))
+    end
+    
     if gunVelocidadFiltrada.Magnitude < 1.0 then return targetHRP.Position end
     
-    local rangeMultiplier = 1.0
-    if dist < 9 then rangeMultiplier = 0.10 elseif dist < 22 then rangeMultiplier = 0.55 elseif dist < 50 then rangeMultiplier = 1.00 else rangeMultiplier = 0.85 end
+    -- 🛡️ MEJORA 2: Sistema de Alerta de Amenaza Próxima (Threat Assessment via Dot Product)
+    local dirToMe = (myHRP.Position - targetHRP.Position).Unit
+    local dot = gunVelocidadFiltrada.Unit:Dot(dirToMe)
+    if dot > 0.25 then
+        -- Multiplica hasta un 35% extra si avanza agresivamente en tu vector de posición
+        local threatFactor = 1 + (dot * 0.35)
+        multiH = multiH * threatFactor
+    end
     
     local posSimulada = targetHRP.Position
     local velSimulada = gunVelocidadFiltrada * multiH * rangeMultiplier
@@ -467,7 +475,7 @@ local function getPredictedPosition()
 end
 
 -- ============================================================================
--- ✨ PARCHE DEL RECTOR DE DISPARO (ANTI-WALL-CLIPPING / TRACER SYNCED)
+-- 🧱 RECTOR DE DISPARO INTERNO (SOPORTA EL LLAMADO ANTIGUO DEL BOTÓN)
 -- ============================================================================
 local function dispararAlMurderer()
     local murdererChar = buscarMurderer()
@@ -481,38 +489,28 @@ local function dispararAlMurderer()
     local arma = (character and character:FindFirstChild("Gun")) or (LocalPlayer:FindFirstChild("Backpack") and LocalPlayer.Backpack:FindFirstChild("Gun"))
     if not arma then return end
     
-    -- 1️⃣ Obtener el punto de origen exacto del proyectil
     local originCFrame = hrp:FindFirstChild("GunRaycastAttachment") and hrp.GunRaycastAttachment.WorldCFrame or hrp.CFrame
     local originPos = originCFrame.Position
     
-    -- 2️⃣ Obtener la trayectoria de predicción calculada
     local targetPos = murdererChar.HumanoidRootPart.Position
     local predicted = getGunPredictedPosition(murdererChar)
     if predicted then targetPos = predicted end
     
-    -- 🧠 FILTRO DE PAREDES OPTIMIZADO
     if states.WallCheck then
         globalRaycastParams.FilterDescendantsInstances = {character, murdererChar, camera}
-        
-        -- 🚫 FASE A: Anti-clipping (Cancela si tu pistola está incrustada físicamente en el muro)
         local clipCheck = workspace:Raycast(hrp.Position, originPos - hrp.Position, globalRaycastParams)
         if clipCheck then return end
-        
-        -- 🚫 FASE B: Trayectoria Real (Cancela si la bala se va a estrellar con un objeto sólido en camino)
         local pathCheck = workspace:Raycast(originPos, targetPos - originPos, globalRaycastParams)
         if pathCheck then return end
     end
     
-    -- 3️⃣ Inyección del disparo al servidor
     if arma and arma:FindFirstChild("Shoot") then
         local yaEquipada = (arma.Parent == character)
         if not yaEquipada then humanoid:EquipTool(arma) task.wait() end
-        
         if predicted then
             local freshPredicted = getGunPredictedPosition(murdererChar)
             if freshPredicted then targetPos = freshPredicted end
         end
-        
         arma.Shoot:FireServer(originCFrame, CFrame.new(targetPos))
     end
     if not yaEquipada then task.wait(0.01) if humanoid then humanoid:UnequipTools() end end
@@ -540,15 +538,67 @@ RunService.RenderStepped:Connect(function()
     else KnifeTargetDot.Visible = false; KnifePredictionCircle.Visible = false; currentTarget = nil end
 end)
 
+-- ============================================================================
+-- 🔗 INYECCIÓN EN EL METAMÉTODO NATIVO (MEJORA 3: SILENT AIM AUTOMÁTICO DE PISTOLA)
+-- ============================================================================
 local WeaponService = require(ReplicatedStorage:WaitForChild("ClientServices"):WaitForChild("WeaponService"))
 local oldGetTargetPosition = WeaponService.GetTargetPosition
 local oldGetMouseTargetCFrame = WeaponService.GetMouseTargetCFrame
+
 WeaponService.GetTargetPosition = function(self, ...)
-    if states.KnifeSilentAim and tieneCuchillo() then local success, pos = pcall(getPredictedPosition); if success and pos then return CFrame.new(pos) end end
+    if states.KnifeSilentAim and tieneCuchillo() then 
+        local success, pos = pcall(getPredictedPosition)
+        if success and pos then return CFrame.new(pos) end 
+    elseif tienePistola() then
+        -- Redirección inmediata al disparar con clicks comunes
+        local murderer = buscarMurderer()
+        if murderer then
+            local success, pos = pcall(getGunPredictedPosition, murderer)
+            if success and pos then
+                if states.WallCheck then
+                    local character = LocalPlayer.Character
+                    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+                    local originCFrame = hrp and (hrp:FindFirstChild("GunRaycastAttachment") and hrp.GunRaycastAttachment.WorldCFrame or hrp.CFrame)
+                    if originCFrame then
+                        globalRaycastParams.FilterDescendantsInstances = {character, murderer, camera}
+                        local clipCheck = workspace:Raycast(hrp.Position, originCFrame.Position - hrp.Position, globalRaycastParams)
+                        local pathCheck = workspace:Raycast(originCFrame.Position, pos - originCFrame.Position, globalRaycastParams)
+                        if not clipCheck and not pathCheck then return CFrame.new(pos) end
+                    end
+                else
+                    return CFrame.new(pos)
+                end
+            end
+        end
+    end
     return oldGetTargetPosition(self, ...)
 end
+
 WeaponService.GetMouseTargetCFrame = function(self, ...)
-    if states.KnifeSilentAim and tieneCuchillo() then local success, pos = pcall(getPredictedPosition); if success and pos then return CFrame.new(pos) end end
+    if states.KnifeSilentAim and tieneCuchillo() then 
+        local success, pos = pcall(getPredictedPosition)
+        if success and pos then return CFrame.new(pos) end 
+    elseif tienePistola() then
+        local murderer = buscarMurderer()
+        if murderer then
+            local success, pos = pcall(getGunPredictedPosition, murderer)
+            if success and pos then
+                if states.WallCheck then
+                    local character = LocalPlayer.Character
+                    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+                    local originCFrame = hrp and (hrp:FindFirstChild("GunRaycastAttachment") and hrp.GunRaycastAttachment.WorldCFrame or hrp.CFrame)
+                    if originCFrame then
+                        globalRaycastParams.FilterDescendantsInstances = {character, murderer, camera}
+                        local clipCheck = workspace:Raycast(hrp.Position, originCFrame.Position - hrp.Position, globalRaycastParams)
+                        local pathCheck = workspace:Raycast(originCFrame.Position, pos - originCFrame.Position, globalRaycastParams)
+                        if not clipCheck and not pathCheck then return CFrame.new(pos) end
+                    end
+                else
+                    return CFrame.new(pos)
+                end
+            end
+        end
+    end
     return oldGetMouseTargetCFrame(self, ...)
 end
 
@@ -605,7 +655,7 @@ RunService.Heartbeat:Connect(function(dt)
     else TracerLine.Visible = false; GreenTracer.Visible = false end
 end)
 
--- UI Botón Físico Shoot
+-- UI Botón Físico Shoot (Mantener compatibilidad)
 ShootButton = Instance.new("TextButton", OverlayGui)
 ShootButton.Size = UDim2.new(0, states.ButtonSize, 0, states.ButtonSize)
 ShootButton.Position = UDim2.new(states.ButtonScaleX, states.ButtonOffsetX, states.ButtonScaleY, states.ButtonOffsetY)
