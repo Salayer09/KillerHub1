@@ -1,21 +1,43 @@
 -- ============================================================================
--- 🚀 KILLER HUB - SCRIPT EJECUTOR ADAPTADO (VERSIÓN V6.7 - API MAESTRA V2.6)
--- ============================================================================
--- 📌 CONFIGURACIÓN AVANZADA: Adaptado al nuevo sistema de inyección en cadena.
--- No se modificó ninguna lógica interna de predicción, física o cálculo de ping.
+-- 🚀 KILLER HUB - SCRIPT EJECUTOR (VERSIÓN V6.6 - OPTIMIZADO PARA NUEVA UI)
 -- ============================================================================
 
 local KillerHub
-if _G.KillerHubInstance then
-    -- Si el nuevo framework ya está corriendo en el entorno, lo hereda directamente
-    KillerHub = _G.KillerHubInstance
-else
-    -- Si no existe, realiza la descarga limpia de la UI Library oficial actualizada
-    KillerHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/Salayer09/Killer-Hub-test/main/Test.lua"))()
-    _G.KillerHubInstance = KillerHub -- Registra la instancia de forma global
+
+-- 1️⃣ CONTROLADOR DE INYECCIÓN PROTEGIDO (NUEVA API)
+-- Evita que el ejecutor muera si hay problemas de conexión con tu repositorio de pruebas
+local success, result = pcall(function()
+    if _G.KillerHubInstance then
+        return _G.KillerHubInstance
+    else
+        -- Enlace corregido a tu repositorio oficial de pruebas
+        return loadstring(game:HttpGet("https://raw.githubusercontent.com/Salayer09/Killer-Hub-test/refs/heads/main/Test.lua"))()
+    end
+end)
+
+if not success or not result then
+    warn("❌ Error Crítico: No se pudo enlazar el ejecutor con la UI de KillerHub: " .. tostring(result))
+    return
 end
 
--- 2️⃣ ACCESO DIRECTO A LAS PESTAÑAS NATIVAS DE LA INTERFAZ
+KillerHub = result
+_G.KillerHubInstance = KillerHub
+
+-- 2️⃣ BUCLE DE ESPERA SEGURO (Anti-Index Nil)
+-- Espera un máximo de 5 segundos a que la estructura interna se declare por completo
+local maxIntentos = 10
+local contador = 0
+while (not KillerHub.Tabs or not KillerHub.Tabs.Visuals) and contador < maxIntentos do
+    task.wait(0.5)
+    contador = contador + 1
+end
+
+if not KillerHub.Tabs or not KillerHub.Tabs.Visuals then
+    warn("❌ Error Estructural: La UI se cargó pero no inicializó las tablas a tiempo.")
+    return
+end
+
+-- 3️⃣ ASIGNACIÓN DE PESTAÑAS INDEXADAS (ESTRUCTURA CORREGIDA V3)
 local Visuals  = KillerHub.Tabs.Visuals
 local Murder   = KillerHub.Tabs.Murder
 local Sheriff  = KillerHub.Tabs.Sheriff
@@ -23,7 +45,7 @@ local Extras   = KillerHub.Tabs.Extras
 local Settings = KillerHub.Tabs.Settings
 
 -- ============================================================================
--- 📊 TABLA DE ESTADOS Y CONFIGURACIÓN LOCAL (SISTEMA BASE CONTINUO)
+-- 💾 SISTEMA DE CONFIGURACIÓN DE ESTADOS INTERNOS
 -- ============================================================================
 local states = {
     -- Ajustes Base Sheriff
@@ -160,9 +182,6 @@ end
 
 loadButtonConfig()
 
--- ============================================================================
--- ⚙️ VARIABLES GLOBALES Y HILOS SECUNDARIOS
--- ============================================================================
 local ShootButton, ShootStroke, ButtonImage, ButtonText
 local cachedPing = 0.125 
 
@@ -207,10 +226,8 @@ local function getHandPosition()
 end
 
 -- ============================================================================
--- 🧱 CONSTRUCCIÓN DE INTERFAZ ACTUALIZADA (API MAESTRA CON PERFILES DE ESTADO)
+-- 🧱 VINCULACIÓN CON MENÚS NATIVOS (NUEVA INTERFAZ ADAPTADA)
 -- ============================================================================
-
--- 🎯 SECCIÓN: SHERIFF (TARGET PREDICTION)
 Sheriff:CreateSection("Target Prediction")
 Sheriff:CreateToggle("S_GunSilentAim", "Gun Silent Aim (Clicks)", function(state) states.GunSilentAim = state saveButtonConfig() end)
 Sheriff:CreateToggle("S_TracerPrediction", "Show Tracer Guide", function(state) states.TracerPrediction = state saveButtonConfig() end)
@@ -219,19 +236,16 @@ Sheriff:CreateSlider("S_TracerSpeed", "Tracer Speed Tuning", 25, 125, function(v
 Sheriff:CreateSlider("S_HorizontalPred", "Horizontal Tuning", 0, 150, function(val) states.HorizontalPrediction = val / 100 saveButtonConfig() end)
 Sheriff:CreateSlider("S_VerticalPred", "Vertical Tuning", 0, 125, function(val) states.VerticalPrediction = val / 100 saveButtonConfig() end)
 
--- 🧠 SECCIÓN: SHERIFF (ADVANCED PREDICTION)
 Sheriff:CreateSection("Advanced Prediction")
 Sheriff:CreateToggle("S_PingAdaptation", "Dynamic Ping Adaptation", function(state) states.PingAdaptation = state saveButtonConfig() end)
 Sheriff:CreateSlider("S_SimDivider", "Simulation Divider (Steps)", 1, 8, function(val) states.SimDivider = math.clamp(math.round(val), 1, 8) saveButtonConfig() end)
 Sheriff:CreateSlider("S_PredInterval", "Prediction Interval (Buffer)", 2, 10, function(val) states.PredInterval = math.clamp(math.round(val), 2, 10) saveButtonConfig() end)
 
--- 🛡️ SECCIÓN: SHERIFF (COMBAT FILTERS)
 Sheriff:CreateSection("Combat Filters")
 Sheriff:CreateToggle("S_WallCheck", "Strict Wall Check", function(state) states.WallCheck = state saveButtonConfig() end)
 Sheriff:CreateToggle("S_SeeLeadTime", "See Lead Time", function(state) states.SeeLeadTime = state saveButtonConfig() end)
 Sheriff:CreateSlider("S_LeadTimePred", "Lead Multiplier", 0, 100, function(val) states.LeadTimePrediction = val / 100 saveButtonConfig() end)
 
--- 🎛️ SECCIÓN: SHERIFF (LEGACY SETTINGS)
 Sheriff:CreateSection("Legacy Settings")
 Sheriff:CreateToggle("S_ShowShootButton", "Show Screen Button", function(state) states.ShowShootButton = state if ShootButton then ShootButton.Visible = state end saveButtonConfig() end)
 Sheriff:CreateToggle("S_SmartVisibility", "Smart Visibility", function(state) states.SmartVisibility = state saveButtonConfig() end)
@@ -239,22 +253,19 @@ Sheriff:CreateToggle("S_LockButton", "Lock Position", function(state) states.Loc
 Sheriff:CreateSlider("S_ButtonSize", "Button Size", 50, 180, function(val) states.ButtonSize = val if ShootButton then ShootButton.Size = UDim2.new(0, val, 0, val) end saveButtonConfig() end)
 Sheriff:CreateSlider("S_ButtonOpacity", "Button Opacity", 0, 100, function(val) local targetTransparency = 1 - (val / 100) states.ButtonOpacity = targetTransparency aplicarOpacidadGlobal(targetTransparency) saveButtonConfig() end)
 
--- 🔪 SECCIÓN: MURDER (KNIFE SILENT AIM)
 Murder:CreateSection("Knife Silent Aim")
 Murder:CreateToggle("M_SilentActive", "Silent Aim Activo", function(state) states.KnifeSilentAim = state saveButtonConfig() end)
 Murder:CreateToggle("M_WallCheck", "Filtro de Paredes (Wall Check)", function(state) states.KnifeWallCheck = state saveButtonConfig() end)
 Murder:CreateSlider("M_FovRadius", "Radio de Captura (FOV)", 30, 350, function(val) states.KnifeFovRadius = val saveButtonConfig() end)
 
--- 📈 SECCIÓN: MURDER (AJUSTES DE PREDICCIÓN)
 Murder:CreateSection("Ajustes de Predicción")
 Murder:CreateSlider("M_PredHoriz", "Intensidad Pred. Horizontal", 0, 320, function(val) states.KnifePredHorizontal = val / 100 saveButtonConfig() end)
 Murder:CreateSlider("M_PredVert", "Intensidad Pred. Vertical", 0, 320, function(val) states.KnifePredVertical = val / 100 saveButtonConfig() end)
 
--- 👁️ SECCIÓN: MURDER (CONFIGURACIÓN VISUAL KNIFE FOV)
 Murder:CreateSection("Configuración Visual Knife FOV")
 Murder:CreateToggle("M_ShowFovCircle", "Mostrar Círculo FOV", function(state) states.KnifeShowFov = state saveButtonConfig() end)
 
--- 🎨 NUEVO COLOR PICKER INTEGRADO EN LÍNEA LIMPIA
+-- Color Picker perfectamente acoplado a la API v3 sin romper callbacks
 Murder:CreateColorPicker("M_KnifeFovColor", "Color del Círculo FOV", Color3.fromRGB(states.KnifeFovR, states.KnifeFovG, states.KnifeFovB), function(colorElegido)
     states.KnifeFovR = math.round(colorElegido.R * 255)
     states.KnifeFovG = math.round(colorElegido.G * 255)
@@ -265,13 +276,13 @@ end)
 Murder:CreateToggle("M_ShowTargetDot", "Mostrar Punto Target", function(state) states.KnifeShowTargetDot = state saveButtonConfig() end)
 Murder:CreateToggle("M_ShowPredCircle", "Mostrar Círculo Predicción", function(state) states.KnifeShowPredCircle = state saveButtonConfig() end)
 
--- 🧱 SECCIONES COMPLEMENTARIAS DEL FRAMEWORK
 Extras:CreateSection("Extras de Rendimiento")
+
 Settings:CreateSection("Configuración del Framework")
 Settings:CreateKeybind("MenuToggle", "Tecla para Ocultar Hub", Enum.KeyCode.RightControl, function(key) end)
 
 -- ============================================================================
--- 🎯 NÚCLEO MATEMÁTICO Y DE PROCESAMIENTO (SIN ALTERACIONES)
+-- 🎯 NÚCLEO MATEMÁTICO Y MOTOR DE PROCESAMIENTO (CONSERVADO COMPLETO)
 -- ============================================================================
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -408,7 +419,7 @@ local function obtenerParteVisible(targetChar)
 end
 
 -- ============================================================================
--- 🎯 SISTEMA COMPLETO DE PREDICCIÓN (CONSERVA PROPIEDADES ORIGINALES)
+-- 🧠 MOTOR PISTOLA
 -- ============================================================================
 local function getGunPredictedPosition(murdererChar)
     if not murdererChar or not murdererChar:FindFirstChild("HumanoidRootPart") then return nil end
@@ -505,6 +516,9 @@ local function getGunPredictedPosition(murdererChar)
     return finalPos
 end
 
+-- ============================================================================
+-- 🧠 MOTOR CUCHILLO
+-- ============================================================================
 local function getPredictedPosition()
     if not currentTarget or not currentTarget.Character or not currentTarget.Character:FindFirstChild("HumanoidRootPart") then return nil end
     local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -598,7 +612,7 @@ local function getPredictedPosition()
 end
 
 -- ============================================================================
--- 🎯 DISPARO AUTOMÁTICO E INTERRUPCIONES DE RENDER
+-- 🧱 LÓGICA INTERNA DISPARADOR AUTOMÁTICO
 -- ============================================================================
 local function dispararAlMurderer()
     local murdererChar = buscarMurderer()
@@ -663,7 +677,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ============================================================================
--- 🔗 METAMÉTODO NATIVO (REDIRECCIÓN POR SILENT AIM DE ARMAS)
+-- 🔗 METAMÉTODOS HUCKADOS (REDIRECCIÓN CLIENT SERVICES)
 -- ============================================================================
 local WeaponService = require(ReplicatedStorage:WaitForChild("ClientServices"):WaitForChild("WeaponService"))
 local oldGetTargetPosition = WeaponService.GetTargetPosition
@@ -779,7 +793,7 @@ RunService.Heartbeat:Connect(function(dt)
 end)
 
 -- ============================================================================
--- 🎨 INTERFAZ GRÁFICA: BOTÓN FÍSICO EN PANTALLA (SHOOT)
+-- 🧱 INTERFAZ FÍSICA BOTÓN EN PANTALLA (SHOOT)
 -- ============================================================================
 ShootButton = Instance.new("TextButton", OverlayGui)
 ShootButton.Size = UDim2.new(0, states.ButtonSize, 0, states.ButtonSize)
@@ -788,7 +802,7 @@ ShootButton.BackgroundColor3 = COLOR_VOID_BASE ShootButton.Text = "" ShootButton
 Instance.new("UICorner", ShootButton).CornerRadius = UDim.new(0, 22)
 ShootStroke = Instance.new("UIStroke", ShootButton) ShootStroke.Thickness = 1.2 ShootStroke.Color = COLOR_STROKE_BASE ShootStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-ButtonImageLabel = Instance.new("ImageLabel", ShootButton) 
+local ButtonImageLabel = Instance.new("ImageLabel", ShootButton) 
 ButtonImageLabel.Size = UDim2.new(0.52, 0, 0.52, 0) 
 ButtonImageLabel.Position = UDim2.new(0.5, 0, 0.47, 0) 
 ButtonImageLabel.AnchorPoint = Vector2.new(0.5, 0.5) 
@@ -797,7 +811,7 @@ ButtonImageLabel.Image = "rbxassetid://12471956230"
 ButtonImageLabel.ZIndex = 12 
 ButtonImage = ButtonImageLabel
 
-ButtonTextLabel = Instance.new("TextLabel", ShootButton) 
+local ButtonTextLabel = Instance.new("TextLabel", ShootButton) 
 ButtonTextLabel.Size = UDim2.new(1, 0, 0.25, 0) 
 ButtonTextLabel.Position = UDim2.new(0, 0, 0.76, 0) 
 ButtonTextLabel.BackgroundTransparency = 1 
@@ -837,7 +851,6 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 warn([[
-
   _  _  _  _  _                     _    _         _       
  | |/ / (_)| | |                   | |  | |       | |      
  | ' /   _ | | |  ___  _ __        | |__| |_   _  | |__    
@@ -858,8 +871,6 @@ warn([[
  |  ___/ / _` | / _ \  | | / _ \                           
  | |    | (_| || (_) | | || (_) |                          
  |_|     \__,_| \___/  |_| \___/                           
-                                                           
-
 ]])
 
 return KillerHub
