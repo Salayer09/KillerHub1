@@ -1,5 +1,5 @@
 -- ============================================================================
--- 🚀 KILLER HUB - SCRIPT EJECUTOR (VERSIÓN V5.5 SUPREME SILENT AIM & INTEL)
+-- 🚀 KILLER HUB - SCRIPT EJECUTOR (VERSIÓN V6.0 ULTRA SILENT AIM & INTEL)
 -- ============================================================================
 
 local KillerHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/Salayer09/Killer-Hub-test/main/Test.lua"))()
@@ -12,7 +12,7 @@ local Settings = KillerHub.Tabs.Settings
 
 local states = {
     -- Ajustes Base Sheriff
-    GunSilentAim = false,       -- [NUEVO] Controla si los clicks normales van al Murderer
+    GunSilentAim = false,       
     TracerPrediction = false,
     JumpPrediction = true, 
     TracerSpeed = 0.85,
@@ -253,6 +253,7 @@ local knifeVelocityBuffer = {}
 local gunVelocidadFiltrada = Vector3.new()
 local gunAceleracionFiltrada = Vector3.new()
 local knifeVelocidadFiltrada = Vector3.new()
+local lastVelHorizontalBase = Vector3.new() -- Guarda memoria del frame anterior para Anti-Zigzag
 local camera = workspace.CurrentCamera
 local currentTarget = nil
 
@@ -364,8 +365,31 @@ local function getClosestTargetInFOV()
 end
 
 -- ============================================================================
--- 🧠 MOTOR DE PREDICCIÓN AVANZADO
+-- 🧠 MOTOR DE PREDICCIÓN AVANZADO REFACTORIZADO (V6.0 GOD MODE)
 -- ============================================================================
+local function obtenerParteVisible(targetChar)
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then 
+        return targetChar:FindFirstChild("HumanoidRootPart") 
+    end
+    globalRaycastParams.FilterDescendantsInstances = {LocalPlayer.Character, targetChar, camera}
+    local origin = LocalPlayer.Character.HumanoidRootPart.Position
+    
+    -- [MEJORA: Escaneo de Extremidades Adaptativo]
+    if targetChar:FindFirstChild("HumanoidRootPart") and not workspace:Raycast(origin, targetChar.HumanoidRootPart.Position - origin, globalRaycastParams) then
+        return targetChar.HumanoidRootPart
+    end
+    if targetChar:FindFirstChild("Head") and not workspace:Raycast(origin, targetChar.Head.Position - origin, globalRaycastParams) then
+        return targetChar.Head
+    end
+    if targetChar:FindFirstChild("LeftUpperLeg") and not workspace:Raycast(origin, targetChar.LeftUpperLeg.Position - origin, globalRaycastParams) then
+        return targetChar.LeftUpperLeg
+    end
+    if targetChar:FindFirstChild("RightUpperLeg") and not workspace:Raycast(origin, targetChar.RightUpperLeg.Position - origin, globalRaycastParams) then
+        return targetChar.RightUpperLeg
+    end
+    return targetChar:FindFirstChild("HumanoidRootPart")
+end
+
 local function getGunPredictedPosition(murdererChar)
     if not murdererChar or not murdererChar:FindFirstChild("HumanoidRootPart") then return nil end
     local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -446,10 +470,15 @@ local function getPredictedPosition()
     local targetHum = currentTarget.Character:FindFirstChildOfClass("Humanoid")
     if not myHRP or not targetHRP then return nil end
     
-    local dist = (myHRP.Position - targetHRP.Position).Magnitude
+    -- Mejora 3: Apuntar al hueso visible (HRP, Cabeza o Piernas)
+    local targetPart = obtenerParteVisible(currentTarget.Character) or targetHRP
+    local dist = (myHRP.Position - targetPart.Position).Magnitude
+    
     local pHoriz, pVert = tonumber(states.KnifePredHorizontal) or 1.5, tonumber(states.KnifePredVertical) or 1.0
     local ping = cachedPing or 0.06
-    local timeToTarget = (dist / 245) + (ping * 1.12)
+    
+    -- Mejora 4: Compensación por Caída de Distancia Dinámica (* 1.05)
+    local timeToTarget = (dist / 245) * 1.05 + (ping * 1.12)
     
     if states.PingAdaptation then
         local pingEnMs = ping * 1000
@@ -459,7 +488,21 @@ local function getPredictedPosition()
         end
     end
     
+    -- 🛡️ [ESCUDO ANTI-LAG HORIZONTAL]
     local rawVelocity = targetHRP.Velocity
+    
+    -- 1. Capar picos de lag por velocidad absurda
+    local maxSafeSpeed = 26
+    if rawVelocity.Magnitude > maxSafeSpeed then
+        rawVelocity = rawVelocity.Unit * maxSafeSpeed
+    end
+    
+    -- 2. Suavizado Lerp entre frames
+    if #knifeVelocityBuffer > 0 then
+        local lastVel = knifeVelocityBuffer[#knifeVelocityBuffer]
+        rawVelocity = lastVel:Lerp(rawVelocity, 0.25)
+    end
+    
     table.insert(knifeVelocityBuffer, rawVelocity)
     while #knifeVelocityBuffer > (states.PredInterval or 5) do table.remove(knifeVelocityBuffer, 1) end
     
@@ -469,14 +512,60 @@ local function getPredictedPosition()
     
     local velHorizontal = Vector3.new(knifeVelocidadFiltrada.X, 0, knifeVelocidadFiltrada.Z)
     local magH = velHorizontal.Magnitude
+    
+    -- Mejora 2: Detección de Aceleración Inversa (Anti-Zigzag / Strafing)
+    if lastVelHorizontalBase.Magnitude > 0 and magH > 0 then
+        local direccionDot = lastVelHorizontalBase.Unit:Dot(velHorizontal.Unit)
+        if direccionDot < 0.2 then
+            pHoriz = pHoriz * 0.35 -- Reduce predicción si cambia bruscamente de lado
+        end
+    end
+    lastVelHorizontalBase = velHorizontal
+    
+    -- 3. Zona Muerta Estricta (Anti-Microstutter)
     local adaptiveDampener = 1
-    if magH < 14 then adaptiveDampener = math.clamp(magH / 14, 0.35, 1) end
+    if magH < 2 then
+        adaptiveDampener = 0 
+    elseif magH < 14 then 
+        adaptiveDampener = math.clamp(magH / 14, 0.15, 1) 
+    end
     
     local horizOffsetX = math.clamp(knifeVelocidadFiltrada.X * pHoriz * timeToTarget * adaptiveDampener, -35, 35)
     local horizOffsetZ = math.clamp(knifeVelocidadFiltrada.Z * pHoriz * timeToTarget * adaptiveDampener, -35, 35)
-    local verticalOffset = (targetHum and targetHum.FloorMaterial == Enum.Material.Air) and ((knifeVelocidadFiltrada.Y * timeToTarget) - (0.5 * 196.2 * math.pow(timeToTarget, 2))) or (knifeVelocidadFiltrada.Y * timeToTarget * 0.55)
     
-    return targetHRP.Position + Vector3.new(horizOffsetX, math.clamp(verticalOffset * pVert, -12, 22), horizOffsetZ)
+    -- 🛠️ [SISTEMA VERTICAL ANTISUELO CORREGIDO]
+    local verticalOffset = 0
+    local deVerdadEstaEnElAire = (targetHum and targetHum.FloorMaterial == Enum.Material.Air) or (math.abs(knifeVelocidadFiltrada.Y) > 3.5)
+    
+    if deVerdadEstaEnElAire then
+        if knifeVelocidadFiltrada.Y > 0.5 then
+            verticalOffset = knifeVelocidadFiltrada.Y * timeToTarget * 0.85
+        else
+            verticalOffset = knifeVelocidadFiltrada.Y * timeToTarget * 0.35
+        end
+    else
+        verticalOffset = 0
+    end
+    
+    local finalVertical = math.clamp(verticalOffset * pVert, -1.8, 12)
+    
+    -- Posición destino base calculada
+    local destinoPred = targetPart.Position + Vector3.new(horizOffsetX, finalVertical, horizOffsetZ)
+    
+    -- Mejora 1: Filtro Oclusión de Esquinas (Anti-Wall Clip)
+    if states.KnifeWallCheck then
+        local wallPathParams = RaycastParams.new()
+        wallPathParams.FilterType = Enum.RaycastFilterType.Exclude
+        wallPathParams.FilterDescendantsInstances = {currentTarget.Character, LocalPlayer.Character, camera}
+        
+        local golpePared = workspace:Raycast(targetPart.Position, destinoPred - targetPart.Position, wallPathParams)
+        if golpePared then
+            -- Ajusta la bolita al ras de la pared restando una milésima de vector unitario
+            destinoPred = golpePared.Position - (magH > 0 and velHorizontal.Unit * 0.4 or Vector3.new())
+        end
+    end
+    
+    return destinoPred
 end
 
 -- ============================================================================
@@ -509,7 +598,6 @@ local function dispararAlMurderer()
         if pathCheck then return end
     end
     
-    -- CORRECCIÓN: Variable definida en el scope correcto para evitar fallas al desequipar
     local yaEquipada = false
     if arma and arma:FindFirstChild("Shoot") then
         yaEquipada = (arma.Parent == character)
@@ -546,7 +634,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ============================================================================
--- 🔗 METAMÉTODO NATIVO (REDIRECCIÓN POR S_GunSilentAim ACTIVADO)
+-- 🔗 METAMÉTODO NATIVO (REDIRECCIÓN POR SILENT AIM)
 -- ============================================================================
 local WeaponService = require(ReplicatedStorage:WaitForChild("ClientServices"):WaitForChild("WeaponService"))
 local oldGetTargetPosition = WeaponService.GetTargetPosition
@@ -556,7 +644,7 @@ WeaponService.GetTargetPosition = function(self, ...)
     if states.KnifeSilentAim and tieneCuchillo() then 
         local success, pos = pcall(getPredictedPosition)
         if success and pos then return CFrame.new(pos) end 
-    elseif states.GunSilentAim and tienePistola() then -- [MODIFICADO]: Ahora depende de la UI
+    elseif states.GunSilentAim and tienePistola() then 
         local murderer = buscarMurderer()
         if murderer then
             local success, pos = pcall(getGunPredictedPosition, murderer)
@@ -584,7 +672,7 @@ WeaponService.GetMouseTargetCFrame = function(self, ...)
     if states.KnifeSilentAim and tieneCuchillo() then 
         local success, pos = pcall(getPredictedPosition)
         if success and pos then return CFrame.new(pos) end 
-    elseif states.GunSilentAim and tienePistola() then -- [MODIFICADO]: Ahora depende de la UI
+    elseif states.GunSilentAim and tienePistola() then 
         local murderer = buscarMurderer()
         if murderer then
             local success, pos = pcall(getGunPredictedPosition, murderer)
@@ -615,7 +703,6 @@ RunService.Heartbeat:Connect(function(dt)
     if rolesPartida[LocalPlayer.Name] == "Murderer" or ocultarPorSmartVisibility then TracerLine.Visible = false; GreenTracer.Visible = false; return end
     
     local murdererChar = buscarMurderer()
-    -- CORRECCIÓN: Agregada validación estricta del HumanoidRootPart del Murderer
     if murdererChar and murdererChar:FindFirstChild("HumanoidRootPart") and character and character:FindFirstChild("HumanoidRootPart") then
         table.insert(gunVelocityBuffer, murdererChar.HumanoidRootPart.Velocity)
         while #gunVelocityBuffer > (states.PredInterval or 5) do table.remove(gunVelocityBuffer, 1) end
@@ -719,7 +806,7 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 print([[
-.
+
   _  _  _  _  _                     _    _         _       
  | |/ / (_)| | |                   | |  | |       | |      
  | ' /   _ | | |  ___  _ __        | |__| |_   _  | |__    
@@ -741,7 +828,6 @@ print([[
  | |    | (_| || (_) | | || (_) |                          
  |_|     \__,_| \___/  |_| \___/                           
                                                            
-.
-]])
 
+]])
 return KillerHub
