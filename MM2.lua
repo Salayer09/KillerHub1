@@ -12,6 +12,7 @@ local Settings = KillerHub.Tabs.Settings
 
 local states = {
     -- Ajustes Base Sheriff
+    GunSilentAim = false,       -- [NUEVO] Controla si los clicks normales van al Murderer
     TracerPrediction = false,
     JumpPrediction = true, 
     TracerSpeed = 0.85,
@@ -64,6 +65,7 @@ local FILE_NAME = "KillerHub_Button_Config.json"
 local function saveButtonConfig()
     if writefile then
         local data = {
+            GunSilentAim = states.GunSilentAim,
             TracerPrediction = states.TracerPrediction,
             JumpPrediction = states.JumpPrediction,
             TracerSpeed = states.TracerSpeed,
@@ -105,6 +107,7 @@ local function loadButtonConfig()
     if success and content then
         local decodeSuccess, result = pcall(function() return HttpService:JSONDecode(content) end)
         if decodeSuccess and type(result) == "table" then
+            if result.GunSilentAim ~= nil then states.GunSilentAim = result.GunSilentAim end
             if result.TracerPrediction ~= nil then states.TracerPrediction = result.TracerPrediction end
             if result.JumpPrediction ~= nil then states.JumpPrediction = result.JumpPrediction end
             states.TracerSpeed = result.TracerSpeed or 0.85
@@ -162,13 +165,17 @@ local function aplicarOpacidadGlobal(transparencia)
 end
 
 local function tieneCuchillo()
-    local character = game:GetService("Players").LocalPlayer.Character
-    return character and (character:FindFirstChild("Knife") or game:GetService("Players").LocalPlayer:FindFirstChild("Backpack"):FindFirstChild("Knife"))
+    local player = game:GetService("Players").LocalPlayer
+    local character = player.Character
+    local backpack = player:FindFirstChild("Backpack")
+    return (character and character:FindFirstChild("Knife") ~= nil) or (backpack and backpack:FindFirstChild("Knife") ~= nil)
 end
 
 local function tienePistola()
-    local character = game:GetService("Players").LocalPlayer.Character
-    return character and (character:FindFirstChild("Gun") or game:GetService("Players").LocalPlayer:FindFirstChild("Backpack"):FindFirstChild("Gun"))
+    local player = game:GetService("Players").LocalPlayer
+    local character = player.Character
+    local backpack = player:FindFirstChild("Backpack")
+    return (character and character:FindFirstChild("Gun") ~= nil) or (backpack and backpack:FindFirstChild("Gun") ~= nil)
 end
 
 local function getHandPosition()
@@ -185,6 +192,7 @@ end
 -- 🧱 INTERFAZ NATIVA
 -- ============================================================================
 Sheriff:CreateSection("Target Prediction")
+Sheriff:CreateToggle("S_GunSilentAim", "Gun Silent Aim (Clicks)", function(state) states.GunSilentAim = state saveButtonConfig() end)
 Sheriff:CreateToggle("S_TracerPrediction", "Show Tracer Guide", function(state) states.TracerPrediction = state saveButtonConfig() end)
 Sheriff:CreateToggle("S_JumpPrediction", "Adaptive Jump Prediction", function(state) states.JumpPrediction = state saveButtonConfig() end)
 Sheriff:CreateSlider("S_TracerSpeed", "Tracer Speed Tuning", 25, 125, function(val) states.TracerSpeed = val / 100 saveButtonConfig() end)
@@ -356,7 +364,7 @@ local function getClosestTargetInFOV()
 end
 
 -- ============================================================================
--- 🧠 MOTOR DE PREDICCIÓN AVANZADO (INTERPOLACIÓN & THREAT ASSESSMENT INTEGRADO)
+-- 🧠 MOTOR DE PREDICCIÓN AVANZADO
 -- ============================================================================
 local function getGunPredictedPosition(murdererChar)
     if not murdererChar or not murdererChar:FindFirstChild("HumanoidRootPart") then return nil end
@@ -382,7 +390,6 @@ local function getGunPredictedPosition(murdererChar)
         end
     end
     
-    -- 📉 MEJORA 1: Suavizado de Curva de Rango (Smooth Range Interpolation)
     local rangeMultiplier = 1.0
     if dist < 50 then
         rangeMultiplier = 0.10 + (0.90 * (dist / 50))
@@ -392,11 +399,9 @@ local function getGunPredictedPosition(murdererChar)
     
     if gunVelocidadFiltrada.Magnitude < 1.0 then return targetHRP.Position end
     
-    -- 🛡️ MEJORA 2: Sistema de Alerta de Amenaza Próxima (Threat Assessment via Dot Product)
     local dirToMe = (myHRP.Position - targetHRP.Position).Unit
     local dot = gunVelocidadFiltrada.Unit:Dot(dirToMe)
     if dot > 0.25 then
-        -- Multiplica hasta un 35% extra si avanza agresivamente en tu vector de posición
         local threatFactor = 1 + (dot * 0.35)
         multiH = multiH * threatFactor
     end
@@ -475,7 +480,7 @@ local function getPredictedPosition()
 end
 
 -- ============================================================================
--- 🧱 RECTOR DE DISPARO INTERNO (SOPORTA EL LLAMADO ANTIGUO DEL BOTÓN)
+-- 🧱 RECTOR DE DISPARO INTERNO (BOTÓN SHOOT)
 -- ============================================================================
 local function dispararAlMurderer()
     local murdererChar = buscarMurderer()
@@ -504,8 +509,10 @@ local function dispararAlMurderer()
         if pathCheck then return end
     end
     
+    -- CORRECCIÓN: Variable definida en el scope correcto para evitar fallas al desequipar
+    local yaEquipada = false
     if arma and arma:FindFirstChild("Shoot") then
-        local yaEquipada = (arma.Parent == character)
+        yaEquipada = (arma.Parent == character)
         if not yaEquipada then humanoid:EquipTool(arma) task.wait() end
         if predicted then
             local freshPredicted = getGunPredictedPosition(murdererChar)
@@ -539,7 +546,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ============================================================================
--- 🔗 INYECCIÓN EN EL METAMÉTODO NATIVO (MEJORA 3: SILENT AIM AUTOMÁTICO DE PISTOLA)
+-- 🔗 METAMÉTODO NATIVO (REDIRECCIÓN POR S_GunSilentAim ACTIVADO)
 -- ============================================================================
 local WeaponService = require(ReplicatedStorage:WaitForChild("ClientServices"):WaitForChild("WeaponService"))
 local oldGetTargetPosition = WeaponService.GetTargetPosition
@@ -549,8 +556,7 @@ WeaponService.GetTargetPosition = function(self, ...)
     if states.KnifeSilentAim and tieneCuchillo() then 
         local success, pos = pcall(getPredictedPosition)
         if success and pos then return CFrame.new(pos) end 
-    elseif tienePistola() then
-        -- Redirección inmediata al disparar con clicks comunes
+    elseif states.GunSilentAim and tienePistola() then -- [MODIFICADO]: Ahora depende de la UI
         local murderer = buscarMurderer()
         if murderer then
             local success, pos = pcall(getGunPredictedPosition, murderer)
@@ -578,7 +584,7 @@ WeaponService.GetMouseTargetCFrame = function(self, ...)
     if states.KnifeSilentAim and tieneCuchillo() then 
         local success, pos = pcall(getPredictedPosition)
         if success and pos then return CFrame.new(pos) end 
-    elseif tienePistola() then
+    elseif states.GunSilentAim and tienePistola() then -- [MODIFICADO]: Ahora depende de la UI
         local murderer = buscarMurderer()
         if murderer then
             local success, pos = pcall(getGunPredictedPosition, murderer)
@@ -609,7 +615,8 @@ RunService.Heartbeat:Connect(function(dt)
     if rolesPartida[LocalPlayer.Name] == "Murderer" or ocultarPorSmartVisibility then TracerLine.Visible = false; GreenTracer.Visible = false; return end
     
     local murdererChar = buscarMurderer()
-    if murdererChar and character and character:FindFirstChild("HumanoidRootPart") then
+    -- CORRECCIÓN: Agregada validación estricta del HumanoidRootPart del Murderer
+    if murdererChar and murdererChar:FindFirstChild("HumanoidRootPart") and character and character:FindFirstChild("HumanoidRootPart") then
         table.insert(gunVelocityBuffer, murdererChar.HumanoidRootPart.Velocity)
         while #gunVelocityBuffer > (states.PredInterval or 5) do table.remove(gunVelocityBuffer, 1) end
         local sumX, sumY, sumZ, totalWeight = 0, 0, 0, 0
@@ -655,7 +662,7 @@ RunService.Heartbeat:Connect(function(dt)
     else TracerLine.Visible = false; GreenTracer.Visible = false end
 end)
 
--- UI Botón Físico Shoot (Mantener compatibilidad)
+-- UI Botón Físico Shoot
 ShootButton = Instance.new("TextButton", OverlayGui)
 ShootButton.Size = UDim2.new(0, states.ButtonSize, 0, states.ButtonSize)
 ShootButton.Position = UDim2.new(states.ButtonScaleX, states.ButtonOffsetX, states.ButtonScaleY, states.ButtonOffsetY)
