@@ -1,5 +1,5 @@
 -- ============================================================================
--- 🚀 KILLER HUB - SCRIPT EJECUTOR (VERSIÓN V6.5 ANTI-MINI AVATARS & GOD AIM)
+-- 🚀 KILLER HUB - SCRIPT EJECUTOR (VERSIÓN V6.6 - COLOR PICKER RESTAURADO)
 -- ============================================================================
 
 local KillerHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/Salayer09/Killer-Hub-test/main/Test.lua"))()
@@ -227,6 +227,15 @@ Murder:CreateSlider("M_PredVert", "Intensidad Pred. Vertical", 0, 320, function(
 
 Murder:CreateSection("Configuración Visual Knife FOV")
 Murder:CreateToggle("M_ShowFovCircle", "Mostrar Círculo FOV", function(state) states.KnifeShowFov = state saveButtonConfig() end)
+
+-- 🎨 [COLOR PICKER INTEGRADO CON LA API]
+Murder:CreateColorPicker("M_KnifeFovColor", "Color del Círculo FOV", Color3.fromRGB(states.KnifeFovR, states.KnifeFovG, states.KnifeFovB), function(colorElegido)
+    states.KnifeFovR = math.round(colorElegido.R * 255)
+    states.KnifeFovG = math.round(colorElegido.G * 255)
+    states.KnifeFovB = math.round(colorElegido.B * 255)
+    saveButtonConfig()
+end)
+
 Murder:CreateToggle("M_ShowTargetDot", "Mostrar Punto Target", function(state) states.KnifeShowTargetDot = state saveButtonConfig() end)
 Murder:CreateToggle("M_ShowPredCircle", "Mostrar Círculo Predicción", function(state) states.KnifeShowPredCircle = state saveButtonConfig() end)
 
@@ -381,7 +390,6 @@ local function getGunPredictedPosition(murdererChar)
     if not murdererChar or not murdererChar:FindFirstChild("HumanoidRootPart") then return nil end
     local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     
-    -- 🛠️ Redirigir al hueso visible en vez de fijar ciegamente el HRP desalineado
     local targetPart = obtenerParteVisible(murdererChar) or murdererChar.HumanoidRootPart
     local targetHum = murdererChar:FindFirstChildOfClass("Humanoid")
     if not myHRP or not targetPart then return nil end
@@ -394,12 +402,11 @@ local function getGunPredictedPosition(murdererChar)
     local multiH = states.HorizontalPrediction or 1.00
     local multiV = states.VerticalPrediction or 1.00
     
-    -- 👾 [DETECTOR DE ESCALA DE AVATAR CUSTOM]
     local avatarScale = 1
     if targetHum then
         local heightScale = targetHum:FindFirstChild("HeightScale")
         if heightScale then
-            avatarScale = math.clamp(heightScale.Value, 0.3, 1) -- Detecta si mide menos del 100%
+            avatarScale = math.clamp(heightScale.Value, 0.3, 1)
         end
     end
     
@@ -420,7 +427,6 @@ local function getGunPredictedPosition(murdererChar)
     end
     
     if gunVelocidadFiltrada.Magnitude < 1.0 then 
-        -- Si está quieto y es enano, bajamos el punto un poco para impactar centro de masa real
         if avatarScale < 0.75 and targetPart.Name == "HumanoidRootPart" then
             return targetPart.Position - Vector3.new(0, 0.5 * (1 - avatarScale), 0)
         end
@@ -462,14 +468,12 @@ local function getGunPredictedPosition(murdererChar)
             end
         else yOffset = gunVelocidadFiltrada.Y * tiempoDeVuelo * 0.20 * multiV end
     else 
-        -- 🛠️ Forzar 0 en suelo firme para evitar que la física de piernas cortas levante el tiro falso
         yOffset = 0 
     end
     
     yOffset = math.clamp(yOffset, -4.0, 6.0)
     local finalPos = Vector3.new(posSimulada.X, posSimulada.Y + yOffset, posSimulada.Z)
     
-    -- Compensación de altura final basada en el tamaño real detectado de la comunidad
     if avatarScale < 0.75 and targetPart.Name == "HumanoidRootPart" then
         finalPos = finalPos - Vector3.new(0, 0.6 * (1 - avatarScale), 0)
     end
@@ -809,7 +813,7 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
-print([[
+warn([[
 
   _  _  _  _  _                     _    _         _       
  | |/ / (_)| | |                   | |  | |       | |      
