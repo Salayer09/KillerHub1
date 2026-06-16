@@ -1,15 +1,30 @@
 -- ============================================================================
--- 🚀 KILLER HUB - SCRIPT EJECUTOR (VERSIÓN V6.6 - ADAPTADO AL NUEVO FRAMEWORK)
+-- 🚀 KILLER HUB - SCRIPT EJECUTOR ADAPTADO (VERSIÓN V6.7 - API MAESTRA V2.6)
+-- ============================================================================
+-- 📌 CONFIGURACIÓN AVANZADA: Adaptado al nuevo sistema de inyección en cadena.
+-- No se modificó ninguna lógica interna de predicción, física o cálculo de ping.
 -- ============================================================================
 
-local KillerHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/Salayer09/KillerHub1/refs/heads/main/MM2.lua"))()
+local KillerHub
+if _G.KillerHubInstance then
+    -- Si el nuevo framework ya está corriendo en el entorno, lo hereda directamente
+    KillerHub = _G.KillerHubInstance
+else
+    -- Si no existe, realiza la descarga limpia de la UI Library oficial actualizada
+    KillerHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/Salayer09/KillerHub1/refs/heads/main/MM2.lua"))()
+    _G.KillerHubInstance = KillerHub -- Registra la instancia de forma global
+end
 
+-- 2️⃣ ACCESO DIRECTO A LAS PESTAÑAS NATIVAS DE LA INTERFAZ
 local Visuals  = KillerHub.Tabs.Visuals
 local Murder   = KillerHub.Tabs.Murder
 local Sheriff  = KillerHub.Tabs.Sheriff
 local Extras   = KillerHub.Tabs.Extras
 local Settings = KillerHub.Tabs.Settings
 
+-- ============================================================================
+-- 📊 TABLA DE ESTADOS Y CONFIGURACIÓN LOCAL (SISTEMA BASE CONTINUO)
+-- ============================================================================
 local states = {
     -- Ajustes Base Sheriff
     GunSilentAim = false,       
@@ -145,6 +160,9 @@ end
 
 loadButtonConfig()
 
+-- ============================================================================
+-- ⚙️ VARIABLES GLOBALES Y HILOS SECUNDARIOS
+-- ============================================================================
 local ShootButton, ShootStroke, ButtonImage, ButtonText
 local cachedPing = 0.125 
 
@@ -189,8 +207,10 @@ local function getHandPosition()
 end
 
 -- ============================================================================
--- 🧱 INTERFAZ NATIVA (ADAPTADA AL NUEVO FRAMEWORK)
+-- 🧱 CONSTRUCCIÓN DE INTERFAZ ACTUALIZADA (API MAESTRA CON PERFILES DE ESTADO)
 -- ============================================================================
+
+-- 🎯 SECCIÓN: SHERIFF (TARGET PREDICTION)
 Sheriff:CreateSection("Target Prediction")
 Sheriff:CreateToggle("S_GunSilentAim", "Gun Silent Aim (Clicks)", function(state) states.GunSilentAim = state saveButtonConfig() end)
 Sheriff:CreateToggle("S_TracerPrediction", "Show Tracer Guide", function(state) states.TracerPrediction = state saveButtonConfig() end)
@@ -199,16 +219,19 @@ Sheriff:CreateSlider("S_TracerSpeed", "Tracer Speed Tuning", 25, 125, function(v
 Sheriff:CreateSlider("S_HorizontalPred", "Horizontal Tuning", 0, 150, function(val) states.HorizontalPrediction = val / 100 saveButtonConfig() end)
 Sheriff:CreateSlider("S_VerticalPred", "Vertical Tuning", 0, 125, function(val) states.VerticalPrediction = val / 100 saveButtonConfig() end)
 
+-- 🧠 SECCIÓN: SHERIFF (ADVANCED PREDICTION)
 Sheriff:CreateSection("Advanced Prediction")
 Sheriff:CreateToggle("S_PingAdaptation", "Dynamic Ping Adaptation", function(state) states.PingAdaptation = state saveButtonConfig() end)
 Sheriff:CreateSlider("S_SimDivider", "Simulation Divider (Steps)", 1, 8, function(val) states.SimDivider = math.clamp(math.round(val), 1, 8) saveButtonConfig() end)
 Sheriff:CreateSlider("S_PredInterval", "Prediction Interval (Buffer)", 2, 10, function(val) states.PredInterval = math.clamp(math.round(val), 2, 10) saveButtonConfig() end)
 
+-- 🛡️ SECCIÓN: SHERIFF (COMBAT FILTERS)
 Sheriff:CreateSection("Combat Filters")
 Sheriff:CreateToggle("S_WallCheck", "Strict Wall Check", function(state) states.WallCheck = state saveButtonConfig() end)
 Sheriff:CreateToggle("S_SeeLeadTime", "See Lead Time", function(state) states.SeeLeadTime = state saveButtonConfig() end)
 Sheriff:CreateSlider("S_LeadTimePred", "Lead Multiplier", 0, 100, function(val) states.LeadTimePrediction = val / 100 saveButtonConfig() end)
 
+-- 🎛️ SECCIÓN: SHERIFF (LEGACY SETTINGS)
 Sheriff:CreateSection("Legacy Settings")
 Sheriff:CreateToggle("S_ShowShootButton", "Show Screen Button", function(state) states.ShowShootButton = state if ShootButton then ShootButton.Visible = state end saveButtonConfig() end)
 Sheriff:CreateToggle("S_SmartVisibility", "Smart Visibility", function(state) states.SmartVisibility = state saveButtonConfig() end)
@@ -216,19 +239,22 @@ Sheriff:CreateToggle("S_LockButton", "Lock Position", function(state) states.Loc
 Sheriff:CreateSlider("S_ButtonSize", "Button Size", 50, 180, function(val) states.ButtonSize = val if ShootButton then ShootButton.Size = UDim2.new(0, val, 0, val) end saveButtonConfig() end)
 Sheriff:CreateSlider("S_ButtonOpacity", "Button Opacity", 0, 100, function(val) local targetTransparency = 1 - (val / 100) states.ButtonOpacity = targetTransparency aplicarOpacidadGlobal(targetTransparency) saveButtonConfig() end)
 
+-- 🔪 SECCIÓN: MURDER (KNIFE SILENT AIM)
 Murder:CreateSection("Knife Silent Aim")
 Murder:CreateToggle("M_SilentActive", "Silent Aim Activo", function(state) states.KnifeSilentAim = state saveButtonConfig() end)
 Murder:CreateToggle("M_WallCheck", "Filtro de Paredes (Wall Check)", function(state) states.KnifeWallCheck = state saveButtonConfig() end)
 Murder:CreateSlider("M_FovRadius", "Radio de Captura (FOV)", 30, 350, function(val) states.KnifeFovRadius = val saveButtonConfig() end)
 
+-- 📈 SECCIÓN: MURDER (AJUSTES DE PREDICCIÓN)
 Murder:CreateSection("Ajustes de Predicción")
 Murder:CreateSlider("M_PredHoriz", "Intensidad Pred. Horizontal", 0, 320, function(val) states.KnifePredHorizontal = val / 100 saveButtonConfig() end)
 Murder:CreateSlider("M_PredVert", "Intensidad Pred. Vertical", 0, 320, function(val) states.KnifePredVertical = val / 100 saveButtonConfig() end)
 
+-- 👁️ SECCIÓN: MURDER (CONFIGURACIÓN VISUAL KNIFE FOV)
 Murder:CreateSection("Configuración Visual Knife FOV")
 Murder:CreateToggle("M_ShowFovCircle", "Mostrar Círculo FOV", function(state) states.KnifeShowFov = state saveButtonConfig() end)
 
--- 🎨 [COLOR PICKER INTEGRADO EN EL RECTOR]
+-- 🎨 NUEVO COLOR PICKER INTEGRADO EN LÍNEA LIMPIA
 Murder:CreateColorPicker("M_KnifeFovColor", "Color del Círculo FOV", Color3.fromRGB(states.KnifeFovR, states.KnifeFovG, states.KnifeFovB), function(colorElegido)
     states.KnifeFovR = math.round(colorElegido.R * 255)
     states.KnifeFovG = math.round(colorElegido.G * 255)
@@ -239,12 +265,13 @@ end)
 Murder:CreateToggle("M_ShowTargetDot", "Mostrar Punto Target", function(state) states.KnifeShowTargetDot = state saveButtonConfig() end)
 Murder:CreateToggle("M_ShowPredCircle", "Mostrar Círculo Predicción", function(state) states.KnifeShowPredCircle = state saveButtonConfig() end)
 
+-- 🧱 SECCIONES COMPLEMENTARIAS DEL FRAMEWORK
 Extras:CreateSection("Extras de Rendimiento")
 Settings:CreateSection("Configuración del Framework")
 Settings:CreateKeybind("MenuToggle", "Tecla para Ocultar Hub", Enum.KeyCode.RightControl, function(key) end)
 
 -- ============================================================================
--- 🎯 LÓGICA DE PROCESAMIENTO (CONSERVADA TOTALMENTE AL 100% SIN CAMBIOS)
+-- 🎯 NÚCLEO MATEMÁTICO Y DE PROCESAMIENTO (SIN ALTERACIONES)
 -- ============================================================================
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -380,6 +407,9 @@ local function obtenerParteVisible(targetChar)
     return targetChar:FindFirstChild("HumanoidRootPart")
 end
 
+-- ============================================================================
+-- 🎯 SISTEMA COMPLETO DE PREDICCIÓN (CONSERVA PROPIEDADES ORIGINALES)
+-- ============================================================================
 local function getGunPredictedPosition(murdererChar)
     if not murdererChar or not murdererChar:FindFirstChild("HumanoidRootPart") then return nil end
     local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -567,6 +597,9 @@ local function getPredictedPosition()
     return destinoPred
 end
 
+-- ============================================================================
+-- 🎯 DISPARO AUTOMÁTICO E INTERRUPCIONES DE RENDER
+-- ============================================================================
 local function dispararAlMurderer()
     local murdererChar = buscarMurderer()
     if not murdererChar or not murdererChar:FindFirstChild("HumanoidRootPart") then return end
@@ -630,7 +663,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ============================================================================
--- 🔗 METAMÉTODOS DEL FILTRO DE INTERCEPCIÓN COORDENADA (SILENT AIM DETOURS)
+-- 🔗 METAMÉTODO NATIVO (REDIRECCIÓN POR SILENT AIM DE ARMAS)
 -- ============================================================================
 local WeaponService = require(ReplicatedStorage:WaitForChild("ClientServices"):WaitForChild("WeaponService"))
 local oldGetTargetPosition = WeaponService.GetTargetPosition
@@ -745,7 +778,9 @@ RunService.Heartbeat:Connect(function(dt)
     else TracerLine.Visible = false; GreenTracer.Visible = false end
 end)
 
--- UI Botón Físico Shoot (Render Mobile Overlay Integrado)
+-- ============================================================================
+-- 🎨 INTERFAZ GRÁFICA: BOTÓN FÍSICO EN PANTALLA (SHOOT)
+-- ============================================================================
 ShootButton = Instance.new("TextButton", OverlayGui)
 ShootButton.Size = UDim2.new(0, states.ButtonSize, 0, states.ButtonSize)
 ShootButton.Position = UDim2.new(states.ButtonScaleX, states.ButtonOffsetX, states.ButtonScaleY, states.ButtonOffsetY)
