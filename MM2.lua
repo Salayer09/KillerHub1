@@ -1,5 +1,5 @@
 -- ============================================================================
--- 🚀 KILLER HUB - SCRIPT EJECUTOR (VERSIÓN V5.5 SUPREME SILENT AIM & INTEL)
+-- 🚀 KILLER HUB - SCRIPT EJECUTOR (VERSIÓN V6.0 BRUTEFORCE RAGE EDITION)
 -- ============================================================================
 
 local KillerHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/Salayer09/Killer-Hub-test/main/Test.lua"))()
@@ -25,12 +25,16 @@ local states = {
     SeeLeadTime = false,
     LeadTimePrediction = 0.30,
     SmartVisibility = false,
+    GunSilentAim = false,
+    
+    -- 🛠️ Nuevas Mecánicas de Predicción Avanzada (True por defecto para no fallar)
+    KinematicPred = true,   -- Motor Cinemático de Segundo Orden
+    AntiStrafing = true,    -- Filtro de Compensación Zig-Zag
+    BacktrackComp = true,   -- Extrapolador de Desincronización de Servidor
     
     -- Ajustes Expertos
     SimDivider = 4,       
     PredInterval = 5,     
-    
-    -- 🧠 Sistema de Adaptación de Ping Inteligente
     PingAdaptation = false, 
     
     -- UI Botón
@@ -77,6 +81,10 @@ local function saveButtonConfig()
             SeeLeadTime = states.SeeLeadTime,
             LeadTimePrediction = states.LeadTimePrediction,
             SmartVisibility = states.SmartVisibility,
+            GunSilentAim = states.GunSilentAim,
+            KinematicPred = states.KinematicPred,  -- Guardar nuevos estados
+            AntiStrafing = states.AntiStrafing,
+            BacktrackComp = states.BacktrackComp,
             SimDivider = states.SimDivider,        
             PredInterval = states.PredInterval,    
             PingAdaptation = states.PingAdaptation, 
@@ -116,6 +124,10 @@ local function loadButtonConfig()
             if result.SeeLeadTime ~= nil then states.SeeLeadTime = result.SeeLeadTime end
             if result.SmartVisibility ~= nil then states.SmartVisibility = result.SmartVisibility end
             if result.PingAdaptation ~= nil then states.PingAdaptation = result.PingAdaptation end
+            if result.GunSilentAim ~= nil then states.GunSilentAim = result.GunSilentAim end
+            if result.KinematicPred ~= nil then states.KinematicPred = result.KinematicPred end -- Cargar nuevos estados
+            if result.AntiStrafing ~= nil then states.AntiStrafing = result.AntiStrafing end
+            if result.BacktrackComp ~= nil then states.BacktrackComp = result.BacktrackComp end
             states.SimDivider = result.SimDivider or 4
             states.PredInterval = result.PredInterval or 5
             states.ButtonSize = result.ButtonSize or 100
@@ -182,7 +194,7 @@ local function getHandPosition()
 end
 
 -- ============================================================================
--- 🧱 INTERFAZ NATIVA
+-- 🧱 INTERFAZ NATIVA (MENÚ DE CONFIGURACIONES ACTUALIZADO)
 -- ============================================================================
 Sheriff:CreateSection("Target Prediction")
 Sheriff:CreateToggle("S_TracerPrediction", "Show Tracer Guide", function(state) states.TracerPrediction = state saveButtonConfig() end)
@@ -190,6 +202,15 @@ Sheriff:CreateToggle("S_JumpPrediction", "Adaptive Jump Prediction", function(st
 Sheriff:CreateSlider("S_TracerSpeed", "Tracer Speed Tuning", 25, 125, function(val) states.TracerSpeed = val / 100 saveButtonConfig() end)
 Sheriff:CreateSlider("S_HorizontalPred", "Horizontal Tuning", 0, 150, function(val) states.HorizontalPrediction = val / 100 saveButtonConfig() end)
 Sheriff:CreateSlider("S_VerticalPred", "Vertical Tuning", 0, 125, function(val) states.VerticalPrediction = val / 100 saveButtonConfig() end)
+
+Sheriff:CreateSection("Silent Aim (Pistola)")
+Sheriff:CreateToggle("S_GunSilentAim", "Gun Silent Aim (Click Anywhere)", function(state) states.GunSilentAim = state saveButtonConfig() end)
+
+Sheriff:CreateSection("Quantum Engine Modules")
+-- 🌟 NUEVOS TOGGLES INTEGRADOS NATIVAMENTE EN EL MENÚ 🌟
+Sheriff:CreateToggle("S_KinematicPred", "Second-Order Kinematic Pred", function(state) states.KinematicPred = state saveButtonConfig() end)
+Sheriff:CreateToggle("S_AntiStrafing", "Anti-Strafing Filter (Zig-Zag)", function(state) states.AntiStrafing = state saveButtonConfig() end)
+Sheriff:CreateToggle("S_BacktrackComp", "Server Backtrack Extrapolator", function(state) states.BacktrackComp = state saveButtonConfig() end)
 
 Sheriff:CreateSection("Advanced Prediction")
 Sheriff:CreateToggle("S_PingAdaptation", "Dynamic Ping Adaptation", function(state) states.PingAdaptation = state saveButtonConfig() end)
@@ -227,7 +248,7 @@ Settings:CreateSection("Configuración del Framework")
 Settings:CreateKeybind("MenuToggle", "Tecla para Ocultar Hub", Enum.KeyCode.RightControl, function(key) end)
 
 -- ============================================================================
--- 🎯 LÓGICA DE PROCESAMIENTO
+-- 🎯 LÓGICA DE PROCESAMIENTO GENERAL
 -- ============================================================================
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -356,7 +377,7 @@ local function getClosestTargetInFOV()
 end
 
 -- ============================================================================
--- 🧠 MOTOR DE PREDICCIÓN AVANZADO (INTERPOLACIÓN & THREAT ASSESSMENT INTEGRADO)
+-- 🧠 MOTOR DE PREDICCIÓN CON REFACTORIZACIÓN BRUTEFORCE (V6.0)
 -- ============================================================================
 local function getGunPredictedPosition(murdererChar)
     if not murdererChar or not murdererChar:FindFirstChild("HumanoidRootPart") then return nil end
@@ -365,9 +386,16 @@ local function getGunPredictedPosition(murdererChar)
     local targetHum = murdererChar:FindFirstChildOfClass("Humanoid")
     if not myHRP or not targetHRP then return nil end
     
-    local dist = (myHRP.Position - targetHRP.Position).Magnitude
     local ping = cachedPing or 0.125
     local bulletSpeed = 310
+    
+    -- 📡 [MÓDULO 3]: Backtrack Extrapolator (Alineación con el Servidor)
+    local posicionBase = targetHRP.Position
+    if states.BacktrackComp then
+        posicionBase = posicionBase + (gunVelocidadFiltrada * ping)
+    end
+    
+    local dist = (myHRP.Position - posicionBase).Magnitude
     local tiempoDeVuelo = (dist / bulletSpeed) + ping
     
     local multiH = states.HorizontalPrediction or 1.00
@@ -382,7 +410,17 @@ local function getGunPredictedPosition(murdererChar)
         end
     end
     
-    -- 📉 MEJORA 1: Suavizado de Curva de Rango (Smooth Range Interpolation)
+    -- 🛡️ [MÓDULO 2]: Filtro Anti-Strafing (Anulación de oscilación por amago lateral)
+    if states.AntiStrafing and #gunVelocityBuffer >= 3 then
+        local vUltima = gunVelocityBuffer[#gunVelocityBuffer]
+        local vPrevia = gunVelocityBuffer[#gunVelocityBuffer - 2]
+        -- Si detecta cambios inversos de signo en X o Z en frames contiguos, fuerza tiro al centro
+        if (vUltima.X * vPrevia.X < -1) or (vUltima.Z * vPrevia.Z < -1) then
+            multiH = multiH * 0.12  
+        end
+    end
+    
+    -- 📉 Suavizado de Curva de Rango Continuous Formula
     local rangeMultiplier = 1.0
     if dist < 50 then
         rangeMultiplier = 0.10 + (0.90 * (dist / 50))
@@ -390,35 +428,44 @@ local function getGunPredictedPosition(murdererChar)
         rangeMultiplier = math.max(0.85, 1.00 - ((dist - 50) * 0.003))
     end
     
-    if gunVelocidadFiltrada.Magnitude < 1.0 then return targetHRP.Position end
+    if gunVelocidadFiltrada.Magnitude < 1.0 then return posicionBase end
     
-    -- 🛡️ MEJORA 2: Sistema de Alerta de Amenaza Próxima (Threat Assessment via Dot Product)
-    local dirToMe = (myHRP.Position - targetHRP.Position).Unit
+    -- Threat Assessment via Dot Product
+    local dirToMe = (myHRP.Position - posicionBase).Unit
     local dot = gunVelocidadFiltrada.Unit:Dot(dirToMe)
     if dot > 0.25 then
-        -- Multiplica hasta un 35% extra si avanza agresivamente en tu vector de posición
         local threatFactor = 1 + (dot * 0.35)
         multiH = multiH * threatFactor
     end
     
-    local posSimulada = targetHRP.Position
-    local velSimulada = gunVelocidadFiltrada * multiH * rangeMultiplier
-    local totalSteps = states.SimDivider or 4
-    local stepTime = tiempoDeVuelo / totalSteps
+    local posSimulada = posicionBase
+    local tSq = tiempoDeVuelo * tiempoDeVuelo
     
+    -- 🚀 [MÓDULO 1]: Motor de Predicción Cinemática de Segundo Orden (Aceleración Real)
+    if states.KinematicPred then
+        -- Aplicación estricta de la ecuación cuadrática completa reduciendo desvíos de aceleración
+        local xCinematic = posicionBase.X + (gunVelocidadFiltrada.X * tiempoDeVuelo * multiH * rangeMultiplier) + (0.5 * gunAceleracionFiltrada.X * tSq)
+        local zCinematic = posicionBase.Z + (gunVelocidadFiltrada.Z * tiempoDeVuelo * multiH * rangeMultiplier) + (0.5 * gunAceleracionFiltrada.Z * tSq)
+        posSimulada = Vector3.new(xCinematic, posicionBase.Y, zCinematic)
+    else
+        -- Bucle heredado por pasos fijos de velocidad si se desactiva
+        local velSimulada = gunVelocidadFiltrada * multiH * rangeMultiplier
+        local totalSteps = states.SimDivider or 4
+        local stepTime = tiempoDeVuelo / totalSteps
+        for i = 1, totalSteps do
+            velSimulada = velSimulada * 0.88 
+            posSimulada = posSimulada + Vector3.new(velSimulada.X * stepTime, 0, velSimulada.Z * stepTime)
+        end
+    end
+    
+    -- Predicción Física Vertical Adaptativa
     local environmentParams = RaycastParams.new()
     environmentParams.FilterType = Enum.RaycastFilterType.Exclude
     environmentParams.FilterDescendantsInstances = {murdererChar, LocalPlayer.Character}
     local ceilingRay = workspace:Raycast(targetHRP.Position, Vector3.new(0, 13, 0), environmentParams)
     local hasLowCeiling = ceilingRay ~= nil
     
-    for i = 1, totalSteps do
-        velSimulada = velSimulada * 0.88 
-        posSimulada = posSimulada + Vector3.new(velSimulada.X * stepTime, 0, velSimulada.Z * stepTime)
-    end
-    
     local yOffset = 0
-    local tSq = tiempoDeVuelo * tiempoDeVuelo
     if targetHum and targetHum.FloorMaterial == Enum.Material.Air then
         if states.JumpPrediction then
             if hasLowCeiling then
@@ -475,7 +522,7 @@ local function getPredictedPosition()
 end
 
 -- ============================================================================
--- 🧱 RECTOR DE DISPARO INTERNO (SOPORTA EL LLAMADO ANTIGUO DEL BOTÓN)
+-- 🧱 REACTOR DE DISPARO INTERNO (BOTÓN FÍSICO)
 -- ============================================================================
 local function dispararAlMurderer()
     local murdererChar = buscarMurderer()
@@ -539,7 +586,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ============================================================================
--- 🔗 INYECCIÓN EN EL METAMÉTODO NATIVO (MEJORA 3: SILENT AIM AUTOMÁTICO DE PISTOLA)
+-- 🔗 METAMÉTODO NATIVO (INTERCEPTOR DE TARGET)
 -- ============================================================================
 local WeaponService = require(ReplicatedStorage:WaitForChild("ClientServices"):WaitForChild("WeaponService"))
 local oldGetTargetPosition = WeaponService.GetTargetPosition
@@ -549,8 +596,7 @@ WeaponService.GetTargetPosition = function(self, ...)
     if states.KnifeSilentAim and tieneCuchillo() then 
         local success, pos = pcall(getPredictedPosition)
         if success and pos then return CFrame.new(pos) end 
-    elseif tienePistola() then
-        -- Redirección inmediata al disparar con clicks comunes
+    elseif tienePistola() and states.GunSilentAim then 
         local murderer = buscarMurderer()
         if murderer then
             local success, pos = pcall(getGunPredictedPosition, murderer)
@@ -578,7 +624,7 @@ WeaponService.GetMouseTargetCFrame = function(self, ...)
     if states.KnifeSilentAim and tieneCuchillo() then 
         local success, pos = pcall(getPredictedPosition)
         if success and pos then return CFrame.new(pos) end 
-    elseif tienePistola() then
+    elseif tienePistola() and states.GunSilentAim then 
         local murderer = buscarMurderer()
         if murderer then
             local success, pos = pcall(getGunPredictedPosition, murderer)
@@ -612,13 +658,22 @@ RunService.Heartbeat:Connect(function(dt)
     if murdererChar and character and character:FindFirstChild("HumanoidRootPart") then
         table.insert(gunVelocityBuffer, murdererChar.HumanoidRootPart.Velocity)
         while #gunVelocityBuffer > (states.PredInterval or 5) do table.remove(gunVelocityBuffer, 1) end
+        
         local sumX, sumY, sumZ, totalWeight = 0, 0, 0, 0
         for idx, vel in ipairs(gunVelocityBuffer) do
-            local weight = idx sumX = sumX + (vel.X * weight) sumY = sumY + (vel.Y * weight) sumZ = sumZ + (vel.Z * weight) totalWeight = totalWeight + weight
+            local weight = idx 
+            sumX = sumX + (vel.X * weight) 
+            sumY = sumY + (vel.Y * weight) 
+            sumZ = sumZ + (vel.Z * weight) 
+            totalWeight = totalWeight + weight
         end
         local antiguaVelocidad = gunVelocidadFiltrada
         gunVelocidadFiltrada = Vector3.new(sumX / totalWeight, sumY / totalWeight, sumZ / totalWeight)
-        if dt > 0 then gunAceleracionFiltrada = gunAceleracionFiltrada:Lerp((gunVelocidadFiltrada - antiguaVelocidad) / dt, 0.20) end
+        
+        -- Cálculo real de la aceleración física derivada de delta-time
+        if dt > 0 then 
+            gunAceleracionFiltrada = gunAceleracionFiltrada:Lerp((gunVelocidadFiltrada - antiguaVelocidad) / dt, 0.20) 
+        end
 
         if states.TracerPrediction then
             local predictedPos = getGunPredictedPosition(murdererChar)
@@ -655,7 +710,7 @@ RunService.Heartbeat:Connect(function(dt)
     else TracerLine.Visible = false; GreenTracer.Visible = false end
 end)
 
--- UI Botón Físico Shoot (Mantener compatibilidad)
+-- UI Botón Físico Shoot 
 ShootButton = Instance.new("TextButton", OverlayGui)
 ShootButton.Size = UDim2.new(0, states.ButtonSize, 0, states.ButtonSize)
 ShootButton.Position = UDim2.new(states.ButtonScaleX, states.ButtonOffsetX, states.ButtonScaleY, states.ButtonOffsetY)
@@ -710,31 +765,5 @@ UserInputService.InputEnded:Connect(function(input)
         end
     end
 end)
-
-print([[
-.
-  _  _  _  _  _                     _    _         _       
- | |/ / (_)| | |                   | |  | |       | |      
- | ' /   _ | | |  ___  _ __        | |__| |_   _  | |__    
- |  <   | || | | / _ \| '__|       |  __  | | | | | '_ \   
- | . \  | || | ||  __/| |          | |  | | |_| | | |_) |  
- |_|\_\ |_||_|_| \___||_|          |_|  |_|\__,_| |_.__/   
-                                                           
-                ____   __     __                           
-               |  _ \  \ \   / /                           
-               | |_) |  \ \_/ /                            
-               |  _ <    \   /                             
-               | |_) |    | |                              
-               |____/     |_|                              
-                                                           
-  _____                 _                                  
- |  __ \               | |                                 
- | |__) | __ _   ___   | |  ___                            
- |  ___/ / _` | / _ \  | | / _ \                           
- | |    | (_| || (_) | | || (_) |                          
- |_|     \__,_| \___/  |_| \___/                           
-                                                           
-.
-]])
 
 return KillerHub
