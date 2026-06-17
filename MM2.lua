@@ -1,5 +1,5 @@
 -- ============================================================================
--- 🚀 KILLER HUB - SCRIPT EJECUTOR (VERSIÓN V6.6 - OPTIMIZADO PARA NUEVA UI)
+-- 🚀 KILLER HUB - SCRIPT EJECUTOR (VERSIÓN V6.6.1 - ANTI-JITTER ULTRA SMOOTH)
 -- ============================================================================
 
 local KillerHub
@@ -284,7 +284,6 @@ local TweenService = game:GetService("TweenService")
 local rolesPartida = {}
 local ultimoPosTarget = Vector3.new()
 local ultimoPuntoLead = Vector3.new()
-local gunVelocityBuffer = {}
 local knifeVelocityBuffer = {}
 local gunVelocidadFiltrada = Vector3.new()
 local gunAceleracionFiltrada = Vector3.new()
@@ -293,8 +292,7 @@ local lastVelHorizontalBase = Vector3.new()
 local camera = workspace.CurrentCamera
 local currentTarget = nil
 
--- Variables de Optimización y Delta Posición
-local ultimaPosReal = nil
+-- Variables de Optimización y Filtros Estables
 local lastHookTick = 0
 local cachedHookPos = nil
 
@@ -413,7 +411,7 @@ local function obtenerParteVisible(targetChar)
 end
 
 -- ============================================================================
--- 🧠 MOTOR PISTOLA (MEJORADO CON ACELERACIÓN Y PING FLUIDO)
+-- 🧠 MOTOR PISTOLA (MÁXIMA ESTABILIDAD ANTI-TEMBLOR)
 -- ============================================================================
 local function getGunPredictedPosition(murdererChar)
     if not murdererChar or not murdererChar:FindFirstChild("HumanoidRootPart") then return nil end
@@ -434,12 +432,9 @@ local function getGunPredictedPosition(murdererChar)
     local avatarScale = 1
     if targetHum then
         local heightScale = targetHum:FindFirstChild("HeightScale")
-        if heightScale then
-            avatarScale = math.clamp(heightScale.Value, 0.3, 1)
-        end
+        if heightScale then avatarScale = math.clamp(heightScale.Value, 0.3, 1) end
     end
     
-    -- 📉 Adaptación de Ping Fluida/Lineal (Sin saltos bruscos)
     if states.PingAdaptation then
         local factorCompensacion = 1 + (ping * 3.65) 
         multiH = multiH * factorCompensacion
@@ -499,9 +494,9 @@ local function getGunPredictedPosition(murdererChar)
     
     yOffset = math.clamp(yOffset, -4.0, 6.0)
     
-    -- 🚀 Integración Cinética de la Aceleración Filtrada (Evita overshoots drásticos)
+    -- 🚀 Suavizado Cinético Estricto de Aceleración (Previene brincos locos)
     local accOffset = 0.5 * gunAceleracionFiltrada * tSq
-    accOffset = Vector3.new(math.clamp(accOffset.X, -4, 4), math.clamp(accOffset.Y, -2, 3), math.clamp(accOffset.Z, -4, 4))
+    accOffset = Vector3.new(math.clamp(accOffset.X, -1.2, 1.2), math.clamp(accOffset.Y, -0.6, 1.0), math.clamp(accOffset.Z, -1.2, 1.2))
     
     local finalPos = Vector3.new(posSimulada.X, posSimulada.Y + yOffset, posSimulada.Z) + accOffset
     
@@ -557,18 +552,13 @@ local function getPredictedPosition()
     
     if lastVelHorizontalBase.Magnitude > 0 and magH > 0 then
         local direccionDot = lastVelHorizontalBase.Unit:Dot(velHorizontal.Unit)
-        if direccionDot < 0.2 then
-            pHoriz = pHoriz * 0.35 
-        end
+        if direccionDot < 0.2 then pHoriz = pHoriz * 0.35 end
     end
     lastVelHorizontalBase = velHorizontal
     
     local adaptiveDampener = 1
-    if magH < 2 then
-        adaptiveDampener = 0 
-    elseif magH < 14 then 
-        adaptiveDampener = math.clamp(magH / 14, 0.15, 1) 
-    end
+    if magH < 2 then adaptiveDampener = 0 
+    elseif magH < 14 then adaptiveDampener = math.clamp(magH / 14, 0.15, 1) end
     
     local horizOffsetX = math.clamp(knifeVelocidadFiltrada.X * pHoriz * timeToTarget * adaptiveDampener, -35, 35)
     local horizOffsetZ = math.clamp(knifeVelocidadFiltrada.Z * pHoriz * timeToTarget * adaptiveDampener, -35, 35)
@@ -577,14 +567,9 @@ local function getPredictedPosition()
     local deVerdadEstaEnElAire = (targetHum and targetHum.FloorMaterial == Enum.Material.Air) or (math.abs(knifeVelocidadFiltrada.Y) > 3.5)
     
     if deVerdadEstaEnElAire then
-        if knifeVelocidadFiltrada.Y > 0.5 then
-            verticalOffset = knifeVelocidadFiltrada.Y * timeToTarget * 0.85
-        else
-            verticalOffset = knifeVelocidadFiltrada.Y * timeToTarget * 0.35
-        end
-    else
-        verticalOffset = 0
-    end
+        if knifeVelocidadFiltrada.Y > 0.5 then verticalOffset = knifeVelocidadFiltrada.Y * timeToTarget * 0.85
+        else verticalOffset = knifeVelocidadFiltrada.Y * timeToTarget * 0.35 end
+    else verticalOffset = 0 end
     
     local finalVertical = math.clamp(verticalOffset * pVert, -1.8, 12)
     local destinoPred = targetPart.Position + Vector3.new(horizOffsetX, finalVertical, horizOffsetZ)
@@ -604,7 +589,7 @@ local function getPredictedPosition()
 end
 
 -- ============================================================================
--- 🧱 LÓGICA INTERNA DISPARADOR AUTOMÁTICO
+-- 🧱 LÓGICA INTERNA DISPARADOR MANUAL
 -- ============================================================================
 local function dispararAlMurderer()
     local murdererChar = buscarMurderer()
@@ -677,7 +662,6 @@ local oldGetMouseTargetCFrame = WeaponService.GetMouseTargetCFrame
 
 local function ejecutarPrediccionCore()
     local currentTick = os.clock()
-    -- Retorna el valor guardado si ya se calculó en este mismísimo frame
     if currentTick == lastHookTick and cachedHookPos ~= nil then
         return cachedHookPos
     end
@@ -726,7 +710,7 @@ WeaponService.GetMouseTargetCFrame = function(self, ...)
 end
 
 -- ============================================================================
--- 🔄 BUCLE PRINCIPAL (ESTABILIZACIÓN DELTA DE VELOCIDAD Y FILTRADOS)
+-- 🔄 BUCLE PRINCIPAL (ESTABILIZACIÓN HÍBRIDA DE MOVIMIENTO Y FILTRO EXPONENCIAL)
 -- ============================================================================
 RunService.Heartbeat:Connect(function(dt)
     local character = LocalPlayer.Character
@@ -737,36 +721,31 @@ RunService.Heartbeat:Connect(function(dt)
     local murdererChar = buscarMurderer()
     if murdererChar and murdererChar:FindFirstChild("HumanoidRootPart") and character and character:FindFirstChild("HumanoidRootPart") then
         
-        -- 📈 Extracción de velocidad ultrasuave basada en Delta de Posición manual
-        local posActual = murdererChar.HumanoidRootPart.Position
-        local velCalculada = murdererChar.HumanoidRootPart.Velocity
+        local hrp = murdererChar.HumanoidRootPart
+        local hum = murdererChar:FindFirstChildOfClass("Humanoid")
         
-        if ultimaPosReal and dt > 0 then
-            local velDelta = (posActual - ultimaPosReal) / dt
-            -- Ignora saltos de teletransportación o fallas físicas extremas del mapa
-            if velDelta.Magnitude < 65 then
-                velCalculada = velDelta
-            end
+        -- 🚀 CAPTURA HÍBRIDA DE VELOCIDAD (Inmune por completo al lag de replicación de red)
+        local rbVel = hrp.AssemblyLinearVelocity or hrp.Velocity or Vector3.new()
+        local velCalculada = rbVel
+        
+        if hum and hum.MoveDirection.Magnitude > 0 then
+            local walkSpeed = hum.WalkSpeed > 0 and hum.WalkSpeed or 16.2
+            -- Fijamos X y Z al vector de intención limpio; mantenemos Y real para saltos o caídas
+            velCalculada = Vector3.new(hum.MoveDirection.X * walkSpeed, rbVel.Y, hum.MoveDirection.Z * walkSpeed)
         end
-        ultimaPosReal = posActual
 
-        table.insert(gunVelocityBuffer, velCalculada)
-        while #gunVelocityBuffer > (states.PredInterval or 5) do table.remove(gunVelocityBuffer, 1) end
-        
-        local sumX, sumY, sumZ, totalWeight = 0, 0, 0, 0
-        for idx, vel in ipairs(gunVelocityBuffer) do
-            local weight = idx 
-            sumX = sumX + (vel.X * weight) 
-            sumY = sumY + (vel.Y * weight) 
-            sumZ = sumZ + (vel.Z * weight) 
-            totalWeight = totalWeight + weight
-        end
-        
         local antiguaVelocidad = gunVelocidadFiltrada
-        gunVelocidadFiltrada = Vector3.new(sumX / totalWeight, sumY / totalWeight, sumZ / totalWeight)
+        -- Filtro Pasabajas Exponencial Adaptativo (Sintonizado fino para pantallas de alta tasa de Hz)
+        gunVelocidadFiltrada = gunVelocidadFiltrada:Lerp(velCalculada, 1 - math.exp(-14 * dt))
         
+        -- 🚀 FILTRADO ULTRA ESTABLE DE ACELERACIÓN
         if dt > 0 then 
-            gunAceleracionFiltrada = gunAceleracionFiltrada:Lerp((gunVelocidadFiltrada - antiguaVelocidad) / dt, 0.22) 
+            local rawAcc = (gunVelocidadFiltrada - antiguaVelocidad) / dt
+            -- Capamos ruidos y picos absurdos causados por micro-lags ambientales
+            if rawAcc.Magnitude > 32 then
+                rawAcc = rawAcc.Unit * 32
+            end
+            gunAceleracionFiltrada = gunAceleracionFiltrada:Lerp(rawAcc, 1 - math.exp(-5 * dt)) 
         end
 
         if states.TracerPrediction then
@@ -789,7 +768,7 @@ RunService.Heartbeat:Connect(function(dt)
             local factorLead = states.LeadTimePrediction or 0.30
             local handPos = getHandPosition()
             if handPos then
-                ultimoPuntoLead = ultimoPuntoLead:Lerp(murdererChar.HumanoidRootPart.Position + (gunVelocidadFiltrada * (factorLead * 1.1)), 0.85)
+                ultimoPuntoLead = ultimoPuntoLead:Lerp(hrp.Position + (gunVelocidadFiltrada * (factorLead * 1.1)), 0.85)
                 local screenHandPos, handOnScreen = camera:WorldToViewportPoint(handPos)
                 local screenTargetPos, targetOnScreen = camera:WorldToViewportPoint(ultimoPuntoLead)
                 if handOnScreen and targetOnScreen then
@@ -804,7 +783,6 @@ RunService.Heartbeat:Connect(function(dt)
     else 
         TracerLine.Visible = false; 
         GreenTracer.Visible = false;
-        ultimaPosReal = nil -- Reinicia la posición si no hay un objetivo activo
     end
 end)
 
@@ -866,27 +844,5 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
-warn([[
-  _  _  _  _  _                     _    _         _       
- | |/ / (_)| | |                   | |  | |       | |      
- | ' /   _ | | |  ___  _ __        | |__| |_   _  | |__    
- |  <   | || | | / _ \| '__|       |  __  | | | | | '_ \   
- | . \  | || | ||  __/| |          | |  | | |_| | | |_) |  
- |_|\_\ |_||_|_| \___||_|          |_|  |_|\__,_| |_.__/   
-                                                           
-                ____   __     __                           
-               |  _ \  \ \   / /                           
-               | |_) |  \ \_/ /                            
-               |  _ <    \   /                             
-               | |_) |    | |                              
-               |____/     |_|                              
-                                                           
-  _____                 _                                  
- |  __ \               | |                                 
- | |__) | __ _   ___   | |  ___                            
- |  ___/ / _` | / _ \  | | / _ \                           
- | |    | (_| || (_) | | || (_) |                          
- |_|     \__,_| \___/  |_| \___/                           
-]])
-
+warn("🚀 KillerHUB v6.6.1 cargado con éxito. Filtros cinéticos estabilizados.")
 return KillerHub
