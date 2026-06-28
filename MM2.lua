@@ -1,6 +1,5 @@
-
 -- ============================================================================
--- 🚀 KILLER HUB - MÓDULO EXTRAS (V7.0 - OPTIMIZADO)
+-- 🚀 KILLER HUB - MÓDULO EXTRAS (V7.0 - NITRO CACHED OPTIMIZED)
 -- ============================================================================
 
 local KillerHub
@@ -49,14 +48,20 @@ local HttpService = game:GetService("HttpService")
 -- ⚡ LOCALIZACIÓN DE FUNCIONES NATIVAS PARA MÁXIMO RENDIMIENTO
 local Color3_fromRGB = Color3.fromRGB
 local Vector3_new = Vector3.new
+local CFrame_new = CFrame.new
+local Instance_new = Instance.new
+local table_insert = table.insert
+local table_clear = table.clear
 local string_find = string.find
 local os_clock = os.clock 
 local pairs = pairs
-local ipairs = ipairs
 local UDim2_new = UDim2.new
 local math_round = math.round
 local math_pow = math.pow
 local task_spawn = task.spawn
+
+-- 📦 CACHÉ DE ENUMS (Evita crear tablas basura en bucles masivos)
+local NORMAL_FACES = Enum.NormalId:GetEnumItems()
 
 -- 🔥 SALVAGUARDA ANTI-CRASH
 local LocalPlayer = Players.LocalPlayer
@@ -68,7 +73,7 @@ end
 local OriginalCrosshairID = ""
 local ARCHIVO_CONFIG = "KillerHub_PerfConfig.json"
 
--- 📊 MAPA CENTRALIZADO DE ESTADOS (Sincronizado con los componentes de la interfaz)
+-- 📊 MAPA CENTRALIZADO DE ESTADOS 
 local states = {
     SpeedGlitchActive = false,
     SpeedGlitchPower = 55,
@@ -90,6 +95,9 @@ local states = {
     knifeEspEnabled = false,
     statsBgTransparency = 0
 }
+
+-- 🔄 VARIABLE CREADA EN MEMORIA FIJA (Evita recrear CFrames en cada frame)
+local currentStretchedCFrame = CFrame_new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1)
 
 -- ============================================================================
 -- 💾 FUNCIONES DE CONFIGURACIÓN LOCAL (SISTEMA DE ARCHIVOS EXECUTOR)
@@ -176,7 +184,7 @@ ExtrasTab:CreateSlider("E_GlitchIntensity", "Fuerza del Glitch", 1, 200, functio
 end)
 
 -- ============================================================================
--- 🎯 SISTEMA DE MIRA CON CACHÉ
+-- 🎯 SISTEMA DE MIRA CON CACHÉ (VERSIÓN V7.0 ORIGINAL)
 -- ============================================================================
 local currentRotationDegrees = 0
 local cachedCrosshairs = {}
@@ -191,7 +199,7 @@ local crosshairList = {
 }
 
 local dropdownOptions = {"Mira Original"}
-for i = 1, #crosshairList do table.insert(dropdownOptions, "Mira N° " .. i) end
+for i = 1, #crosshairList do table_insert(dropdownOptions, "Mira N° " .. i) end
 
 local function localizarObjetosCrosshair()
     local elementosencontrados = {}
@@ -202,18 +210,22 @@ local function localizarObjetosCrosshair()
             local gameFrame = mainGui and mainGui:FindFirstChild("Game")
             local crosshairFrame = gameFrame and gameFrame:FindFirstChild("Crosshair")
             if crosshairFrame then
-                if crosshairFrame:IsA("ImageLabel") or crosshairFrame:IsA("ImageButton") then table.insert(elementosencontrados, crosshairFrame) end
-                for _, obj in ipairs(crosshairFrame:GetDescendants()) do
-                    if obj:IsA("ImageLabel") or obj:IsA("ImageButton") then table.insert(elementosencontrados, obj) end
+                if crosshairFrame:IsA("ImageLabel") or crosshairFrame:IsA("ImageButton") then table_insert(elementosencontrados, crosshairFrame) end
+                local descendants = crosshairFrame:GetDescendants()
+                for i = 1, #descendants do
+                    local obj = descendants[i]
+                    if obj:IsA("ImageLabel") or obj:IsA("ImageButton") then table_insert(elementosencontrados, obj) end
                 end
             end
             
             local topbar = playerGui:FindFirstChild("GameTopbar")
             local topbarCH = topbar and topbar:FindFirstChild("Crosshair")
             if topbarCH then
-                if topbarCH:IsA("ImageLabel") or topbarCH:IsA("ImageButton") then table.insert(elementosencontrados, topbarCH) end
-                for _, obj in ipairs(topbarCH:GetDescendants()) do
-                    if obj:IsA("ImageLabel") or obj:IsA("ImageButton") then table.insert(elementosencontrados, obj) end
+                if topbarCH:IsA("ImageLabel") or topbarCH:IsA("ImageButton") then table_insert(elementosencontrados, topbarCH) end
+                local descendants = topbarCH:GetDescendants()
+                for i = 1, #descendants do
+                    local obj = descendants[i]
+                    if obj:IsA("ImageLabel") or obj:IsA("ImageButton") then table_insert(elementosencontrados, obj) end
                 end
             end
         end
@@ -266,16 +278,17 @@ end)
 
 ExtrasTab:CreateSlider("Cam_TrueStretched", "Verdadera Res. Estirada (%)", 40, 100, function(valor)
     states.StretchedResValue = valor / 100
+    -- 🚀 OPTIMIZACIÓN: Se calcula una sola vez aquí en lugar de hacerlo cada frame
+    currentStretchedCFrame = CFrame_new(0, 0, 0, 1, 0, 0, 0, states.StretchedResValue, 0, 0, 0, 1)
 end)
 
 -- ============================================================================
--- 🪐 MÓDULO: AMBIENTE VISUAL & MOTOR MINECRAFT OPTIMIZADO
+-- 🪐 MÓDULO: AMBIENTE VISUAL & REMOVER DE NEÓN INTEGRAL
 -- ============================================================================
 local lastLightingEnforce = 0
-local originalMapLights = {}
 local originalNeonParts = {}
-local originalBloomSettings = {}
 local originalMaterials = {}
+local luzConnection = nil 
 
 local originalLightingSettings = {
     ClockTime = Lighting.ClockTime,
@@ -292,31 +305,17 @@ local MinecraftAssets = {
     WoodPlanks  = "rbxassetid://87376137354977",
     Grass       = "rbxassetid://96094743851836",
     RedWool     = "rbxassetid://12618677424",
-    Brick       = "rbxassetid://13017216585", -- ✨ Tus nuevas IDs integradas
+    Brick       = "rbxassetid://13017216585", 
     Obsidiana   = "rbxassetid://10480259773",
     Iron        = "rbxassetid://8677286748",
     Glass       = "rbxassetid://11384458772"
 }
 
 local function restaurarLucesYBrillos()
-    for light, oldProps in pairs(originalMapLights) do
-        if light and light.Parent then 
-            light.Enabled = oldProps.Enabled 
-            light.Brightness = oldProps.Brightness
-        end
-    end
     for part, oldMat in pairs(originalNeonParts) do
         if part and part.Parent then part.Material = oldMat end
     end
-    for effect, oldProps in pairs(originalBloomSettings) do
-        if effect and effect.Parent then 
-            effect.Enabled = oldProps.Enabled
-            effect.Intensity = oldProps.Intensity
-        end
-    end
-    table.clear(originalMapLights)
-    table.clear(originalNeonParts)
-    table.clear(originalBloomSettings)
+    table_clear(originalNeonParts)
 end
 
 local function procesarBloqueMinecraft(part, activar)
@@ -361,11 +360,13 @@ local function procesarBloqueMinecraft(part, activar)
             
             part.Material = Enum.Material.SmoothPlastic
             
-            for _, face in ipairs(Enum.NormalId:GetEnumItems()) do
+            -- 🚀 OPTIMIZACIÓN: Se usa la caché global NORMAL_FACES y bucle directo sin ipairs
+            for i = 1, #NORMAL_FACES do
+                local face = NORMAL_FACES[i]
                 local texName = "MC_" .. face.Name
                 local existingTex = part:FindFirstChild(texName)
                 if not existingTex then
-                    local tex = Instance.new("Texture")
+                    local tex = Instance_new("Texture")
                     tex.Name = texName
                     tex.Texture = textureId
                     tex.Face = face
@@ -380,7 +381,9 @@ local function procesarBloqueMinecraft(part, activar)
             part.Material = originalMaterials[part].Material
             part.Color = originalMaterials[part].Color
         end
-        for _, obj in ipairs(part:GetChildren()) do
+        local children = part:GetChildren()
+        for i = 1, #children do
+            local obj = children[i]
             if string_find(obj.Name, "MC_") then obj:Destroy() end
         end
     end
@@ -394,7 +397,7 @@ local function actualizarMapaCompletoMinecraft(estado)
             if i % 150 == 0 then task.wait() end 
         end
         if not estado then
-            table.clear(originalMaterials)
+            table_clear(originalMaterials)
         end
     end)
 end
@@ -407,32 +410,31 @@ Workspace.DescendantAdded:Connect(function(desc)
     end
 end)
 
-local function escanearLucesYNeon(esClimaOscuro)
+local function procesarLuzIndividual(obj, debaApagarNeon)
+    if obj:IsA("BasePart") and obj.Material == Enum.Material.Neon then
+        if originalNeonParts[obj] == nil then originalNeonParts[obj] = obj.Material end
+        obj.Material = debaApagarNeon and Enum.Material.SmoothPlastic or originalNeonParts[obj]
+    end
+end
+
+local function escanearLucesYNeon(debaApagarNeon)
+    if luzConnection then luzConnection:Disconnect() luzConnection = nil end
+    
     task_spawn(function()
         local desc = Workspace:GetDescendants()
         for i = 1, #desc do
-            local obj = desc[i]
-            
-            if obj:IsA("Light") then
-                if originalMapLights[obj] == nil then
-                    originalMapLights[obj] = {Enabled = obj.Enabled, Brightness = obj.Brightness}
-                end
-                if esClimaOscuro then
-                    obj.Enabled = true
-                    obj.Brightness = math.min(originalMapLights[obj].Brightness, 0.25)
-                else
-                    obj.Enabled = originalMapLights[obj].Enabled
-                end
-            elseif obj:IsA("BasePart") and obj.Material == Enum.Material.Neon then
-                if originalNeonParts[obj] == nil then
-                    originalNeonParts[obj] = obj.Material
-                end
-                obj.Material = Enum.Material.SmoothPlastic
-            end
-            
-            if i % 200 == 0 then task.wait() end 
+            procesarLuzIndividual(desc[i], debaApagarNeon)
+            if i % 400 == 0 then task.wait() end 
         end
     end)
+    
+    if debaApagarNeon then
+        luzConnection = Workspace.DescendantAdded:Connect(function(nuevoObj)
+            if nuevoObj:IsA("BasePart") and nuevoObj.Material == Enum.Material.Neon then
+                task.defer(procesarLuzIndividual, nuevoObj, true)
+            end
+        end)
+    end
 end
 
 local function aplicarAtmosphere(tipo)
@@ -461,21 +463,7 @@ local function aplicarAtmosphere(tipo)
         Lighting.ExposureCompensation = -0.10
     end
 
-    escanearLucesYNeon(esClimaOscuro)
-
-    for _, effect in ipairs(Lighting:GetChildren()) do
-        if effect:IsA("BloomEffect") then
-            if originalBloomSettings[effect] == nil then
-                originalBloomSettings[effect] = {Enabled = effect.Enabled, Intensity = effect.Intensity}
-            end
-            if esClimaOscuro then
-                effect.Enabled = true
-                effect.Intensity = 0.05 
-            else
-                effect.Enabled = false
-            end
-        end
-    end
+    escanearLucesYNeon(true)
 end
 
 local function aplicarSkybox(tipo)
@@ -483,18 +471,22 @@ local function aplicarSkybox(tipo)
     
     if tipo == "Por Defecto" then
         if sky then sky:Destroy() end
-        for _, obj in ipairs(Lighting:GetChildren()) do
+        local children = Lighting:GetChildren()
+        for i = 1, #children do
+            local obj = children[i]
             if obj:IsA("Sky") and obj.Name ~= "KillerHubSky" then obj.Enabled = true end
         end
         return
     end
 
-    for _, obj in ipairs(Lighting:GetChildren()) do
+    local children = Lighting:GetChildren()
+    for i = 1, #children do
+        local obj = children[i]
         if obj:IsA("Sky") and obj.Name ~= "KillerHubSky" then obj.Enabled = false end
     end
 
     if not sky then
-        sky = Instance.new("Sky")
+        sky = Instance_new("Sky")
         sky.Name = "KillerHubSky"
         sky.Parent = Lighting
     end
@@ -518,6 +510,7 @@ local listaClimas = {"Por Defecto", "Anochecer", "Media Noche (Apagón)", "Torme
 ExtrasTab:CreateDropdown("E_SkyAtmosphere", "Seleccionar Clima / Hora:", listaClimas, function(seleccion)
     states.CurrentAtmosphere = seleccion
     if seleccion == "Por Defecto" then
+        if luzConnection then luzConnection:Disconnect() luzConnection = nil end
         restaurarLucesYBrillos()
         Lighting.ClockTime = originalLightingSettings.ClockTime
         Lighting.Brightness = originalLightingSettings.Brightness
@@ -549,7 +542,7 @@ local knifeStates = {}
 local lastScanTime = 0
 local SCAN_INTERVAL = 0.05 
 
-local Knife3DBox = Instance.new("BoxHandleAdornment")
+local Knife3DBox = Instance_new("BoxHandleAdornment")
 Knife3DBox.Color3 = Color3_fromRGB(0, 255, 100)
 Knife3DBox.Transparency = 0.25 
 Knife3DBox.AlwaysOnTop = true 
@@ -594,11 +587,12 @@ ExtrasTab:CreateToggle("KnifeTrackerESP", "Knife Tracker ESP (Equipado y Lanzado
     states.knifeEspEnabled = estado
     if not estado then
         Knife3DBox.Visible = false
-        for _, obj in ipairs(Workspace:GetChildren()) do
-            local hl = obj:FindFirstChild("KillerHubKnifeHighlight")
+        local children = Workspace:GetChildren()
+        for i = 1, #children do
+            local hl = children[i]:FindFirstChild("KillerHubKnifeHighlight")
             if hl then hl:Destroy() end
         end
-        table.clear(knifeStates)
+        table_clear(knifeStates)
     end
 end)
 
@@ -614,7 +608,8 @@ RunService.RenderStepped:Connect(function(dt)
         if camera then
             if camera.FieldOfView ~= 70 then camera.FieldOfView = 70 end
             if states.StretchedResValue < 1.0 then
-                camera.CFrame = camera.CFrame * CFrame.new(0, 0, 0, 1, 0, 0, 0, states.StretchedResValue, 0, 0, 0, 1)
+                -- 🚀 OPTIMIZACIÓN: Usa la variable fija pre-calculada en el Slider.
+                camera.CFrame = camera.CFrame * currentStretchedCFrame
             end
         end
     end
@@ -627,24 +622,28 @@ RunService.RenderStepped:Connect(function(dt)
         end
 
         if OriginalCrosshairID == "" and #cachedCrosshairs > 0 then
-            for _, uiElement in ipairs(cachedCrosshairs) do
+            for i = 1, #cachedCrosshairs do
+                local uiElement = cachedCrosshairs[i]
                 if uiElement.Image ~= "" and not string_find(uiElement.Image, "0") then
                     local esPersonalizada = false
-                    for _, id in ipairs(crosshairList) do
-                        if string_find(uiElement.Image, id) then esPersonalizada = true break end
+                    for j = 1, #crosshairList do
+                        if string_find(uiElement.Image, crosshairList[j]) then esPersonalizada = true break end
                     end
                     if not esPersonalizada then OriginalCrosshairID = uiElement.Image break end
                 end
             end
         end
 
-        if #cachedCrosshairs > 0 then
+        local totalCrosshairs = #cachedCrosshairs
+        if totalCrosshairs > 0 then
             if states.CrosshairRotationEnabled then
                 currentRotationDegrees = (currentRotationDegrees + (states.calculatedRotationSpeed * dt)) % 360
             end
              
             local targetID = states.CrosshairActiveID == "Original" and OriginalCrosshairID or ("rbxassetid://" .. states.CrosshairActiveID)
-            for _, uiElement in ipairs(cachedCrosshairs) do
+            -- 🚀 OPTIMIZACIÓN: Reemplazo total de ipairs por un bucle numérico directo indexado
+            for i = 1, totalCrosshairs do
+                local uiElement = cachedCrosshairs[i]
                 pcall(function()
                     if targetID ~= "" then uiElement.Image = targetID end
                     uiElement.Size = UDim2_new(0, states.CrosshairSizeX, 0, states.CrosshairSizeY)
@@ -722,7 +721,7 @@ RunService.RenderStepped:Connect(function(dt)
                             local hl = obj:FindFirstChild("KillerHubKnifeHighlight")
                             if isMoving then
                                 if not hl then
-                                    hl = Instance.new("Highlight")
+                                    hl = Instance_new("Highlight")
                                     hl.Name = "KillerHubKnifeHighlight"
                                     hl.FillColor = Color3_fromRGB(136, 0, 0)      
                                     hl.FillTransparency = 0.35 
@@ -760,14 +759,13 @@ ExtrasTab:CreateToggle("E_PerformanceStats", "Mostrar Contador de Rendimiento", 
     if estado then
         local UserInputService = game:GetService("UserInputService")
         
-        statsGui = Instance.new("ScreenGui")
+        statsGui = Instance_new("ScreenGui")
         statsGui.Name = "KillerHub_PerformanceOverlay"
         statsGui.Parent = CoreGui
 
-        -- Carga la última ubicación que salvaste
         local posGuardada = cargarPosicionLocal()
 
-        statsFrame = Instance.new("Frame", statsGui)
+        statsFrame = Instance_new("Frame", statsGui)
         statsFrame.Size = UDim2_new(0, 145, 0, 75)
         statsFrame.Position = UDim2_new(posGuardada.ScaleX, posGuardada.OffsetX, posGuardada.ScaleY, posGuardada.OffsetY)
         statsFrame.BackgroundColor3 = Color3_fromRGB(12, 4, 22)
@@ -775,10 +773,10 @@ ExtrasTab:CreateToggle("E_PerformanceStats", "Mostrar Contador de Rendimiento", 
         statsFrame.BorderSizePixel = 0
         statsFrame.Active = true
 
-        local Corner = Instance.new("UICorner", statsFrame) Corner.CornerRadius = UDim.new(0, 8)
-        local Stroke = Instance.new("UIStroke", statsFrame) Stroke.Thickness = 1.2 Stroke.Color = Color3_fromRGB(24, 8, 42)
+        local Corner = Instance_new("UICorner", statsFrame) Corner.CornerRadius = UDim.new(0, 8)
+        local Stroke = Instance_new("UIStroke", statsFrame) Stroke.Thickness = 1.2 Stroke.Color = Color3_fromRGB(24, 8, 42)
 
-        local TextLabel = Instance.new("TextLabel", statsFrame)
+        local TextLabel = Instance_new("TextLabel", statsFrame)
         TextLabel.Size = UDim2_new(1, -10, 1, -10)
         TextLabel.Position = UDim2_new(0, 10, 0, 5)
         TextLabel.BackgroundTransparency = 1
@@ -790,8 +788,7 @@ ExtrasTab:CreateToggle("E_PerformanceStats", "Mostrar Contador de Rendimiento", 
         TextLabel.RichText = true
         TextLabel.Text = "Calculando..."
 
-        -- 🔒 BOTÓN DE BLOQUEO / DESBLOQUEO DE POSICIÓN
-        local LockButton = Instance.new("TextButton", statsFrame)
+        local LockButton = Instance_new("TextButton", statsFrame)
         LockButton.Size = UDim2_new(0, 16, 0, 16)
         LockButton.Position = UDim2_new(1, -20, 0, 6)
         LockButton.BackgroundTransparency = 1
@@ -813,7 +810,6 @@ ExtrasTab:CreateToggle("E_PerformanceStats", "Mostrar Contador de Rendimiento", 
             end
         end)
 
-        -- 🖐️ SISTEMA NATIVO DE ARRASTRE (DRAG) CON RESPALDO AL SOLTAR
         local dragging, dragInput, dragStart, startPos
 
         statsFrame.InputBegan:Connect(function(input)
@@ -825,7 +821,6 @@ ExtrasTab:CreateToggle("E_PerformanceStats", "Mostrar Contador de Rendimiento", 
                 input.Changed:Connect(function()
                     if input.UserInputState == Enum.UserInputState.End then
                         dragging = false
-                        -- 💾 Guarda en disco al levantar el dedo o soltar clic
                         guardarPosicionLocal(
                             statsFrame.Position.X.Scale, 
                             statsFrame.Position.X.Offset, 
@@ -855,7 +850,6 @@ ExtrasTab:CreateToggle("E_PerformanceStats", "Mostrar Contador de Rendimiento", 
             end
         end)
 
-        -- 📊 BUCLE DE ACTUALIZACIÓN DE DATOS (FPS / PING / RAM)
         local lastTime = os_clock()
         local frameCount = 0
         local currentFps = 60
