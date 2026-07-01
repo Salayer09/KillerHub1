@@ -1,6 +1,5 @@
 -- ============================================================================
 -- 🚀 KILLER HUB - MÓDULO EXTRAS (V7.0 - NITRO CACHED OPTIMIZED)
--- 🧑‍💻 Actualizado a la API V3.1 (MASTER EXPERT EDITION)
 -- ============================================================================
 
 local KillerHub
@@ -34,8 +33,8 @@ if not KillerHub or type(KillerHub) ~= "table" or not KillerHub.CreateTab then
     return
 end
 
--- 📂 CREACIÓN DE LA PESTAÑA PERSONALIZADA EXTRAS (Sintaxis V3.1 nativa)
-local ExtrasTab = KillerHub:CreateTab("Extras </>")
+-- 📂 CREACIÓN DE LA PESTAÑA PERSONALIZADA EXTRAS
+local ExtrasTab = KillerHub:CreateTab("Extras </>", "rbxassetid://10747373142")
 
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -61,7 +60,7 @@ local math_round = math.round
 local math_pow = math.pow
 local task_spawn = task.spawn
 
--- 📦 CACHÉ DE ENUMS
+-- 📦 CACHÉ DE ENUMS (Evita crear tablas basura en bucles masivos)
 local NORMAL_FACES = Enum.NormalId:GetEnumItems()
 
 -- 🔥 SALVAGUARDA ANTI-CRASH
@@ -97,7 +96,7 @@ local states = {
     statsBgTransparency = 0
 }
 
--- 🔄 VARIABLE CREADA EN MEMORIA FIJA
+-- 🔄 VARIABLE CREADA EN MEMORIA FIJA (Evita recrear CFrames en cada frame)
 local currentStretchedCFrame = CFrame_new(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1)
 
 -- ============================================================================
@@ -175,14 +174,12 @@ end
 -- 🛠️ ASIGNACIÓN: MODIFICADORES DE MOVIMIENTO
 ExtrasTab:CreateSection("Modificadores de Movimiento")
 
--- Corregido: Estilo Toggle V3.1
 ExtrasTab:CreateToggle("E_SpeedGlitch", "Activar Speed Glitch (Físico)", function(estado)
     states.SpeedGlitchActive = estado
     if estado then loopSpeedGlitch() end
 end)
 
--- Corregido: Estilo Slider V3.1 (flag, texto, min, max, step, callback)
-ExtrasTab:CreateSlider("E_GlitchIntensity", "Fuerza del Glitch", 1, 200, 1, function(valor)
+ExtrasTab:CreateSlider("E_GlitchIntensity", "Fuerza del Glitch", 1, 200, function(valor)
     states.SpeedGlitchPower = valor
 end)
 
@@ -244,7 +241,6 @@ ExtrasTab:CreateToggle("C_MasterToggle", "Activar Modificación de Mira", functi
     if estado then cachedCrosshairs = localizarObjetosCrosshair() end
 end)
 
--- Corregido: Estilo Dropdown V3.1 (flag, texto, opciones, callback)
 ExtrasTab:CreateDropdown("C_SelectDropdown", "Seleccionar Diseño de Mira:", dropdownOptions, function(seleccion)
     if seleccion == "Mira Original" then 
         states.CrosshairActiveID = "Original"
@@ -254,9 +250,8 @@ ExtrasTab:CreateDropdown("C_SelectDropdown", "Seleccionar Diseño de Mira:", dro
     end
 end)
 
--- Corregidos: Sliders V3.1 con step 1
-ExtrasTab:CreateSlider("C_SizeX", "Ancho de la Mira (Eje X)", 1, 200, 1, function(valor) states.CrosshairSizeX = valor end)
-ExtrasTab:CreateSlider("C_SizeY", "Alto de la Mira (Eje Y)", 1, 200, 1, function(valor) states.CrosshairSizeY = valor end)
+ExtrasTab:CreateSlider("C_SizeX", "Ancho de la Mira (Eje X)", 1, 200, function(valor) states.CrosshairSizeX = valor end)
+ExtrasTab:CreateSlider("C_SizeY", "Alto de la Mira (Eje Y)", 1, 200, function(valor) states.CrosshairSizeY = valor end)
 
 ExtrasTab:CreateSection("Efecto de Rotación")
 ExtrasTab:CreateToggle("C_RotateToggle", "Habilitar Giro Continuo", function(estado)
@@ -264,7 +259,7 @@ ExtrasTab:CreateToggle("C_RotateToggle", "Habilitar Giro Continuo", function(est
     if not estado then currentRotationDegrees = 0 end
 end)
 
-ExtrasTab:CreateSlider("C_RotSpeed", "Ajuste de Velocidad de Giro", 0, 100, 1, function(valor) 
+ExtrasTab:CreateSlider("C_RotSpeed", "Ajuste de Velocidad de Giro", 0, 100, function(valor) 
     states.calculatedRotationSpeed = (valor * 2) + (math_pow(valor, 2) * 0.12)
 end)
 
@@ -281,9 +276,9 @@ ExtrasTab:CreateToggle("Cam_ControlToggle", "Activar Ajustes de Cámara", functi
     end
 end)
 
--- Corregido: Slider con step 1
-ExtrasTab:CreateSlider("Cam_TrueStretched", "Verdadera Res. Estirada (%)", 40, 100, 1, function(valor)
+ExtrasTab:CreateSlider("Cam_TrueStretched", "Verdadera Res. Estirada (%)", 40, 100, function(valor)
     states.StretchedResValue = valor / 100
+    -- 🚀 OPTIMIZACIÓN: Se calcula una sola vez aquí en lugar de hacerlo cada frame
     currentStretchedCFrame = CFrame_new(0, 0, 0, 1, 0, 0, 0, states.StretchedResValue, 0, 0, 0, 1)
 end)
 
@@ -365,11 +360,11 @@ local function procesarBloqueMinecraft(part, activar)
             
             part.Material = Enum.Material.SmoothPlastic
             
+            -- 🚀 OPTIMIZACIÓN: Se usa la caché global NORMAL_FACES y bucle directo sin ipairs
             for i = 1, #NORMAL_FACES do
                 local face = NORMAL_FACES[i]
                 local texName = "MC_" .. face.Name
                 local existingTex = part:FindFirstChild(texName)
-           
                 if not existingTex then
                     local tex = Instance_new("Texture")
                     tex.Name = texName
@@ -512,7 +507,6 @@ end
 ExtrasTab:CreateSection("Ambiente Visual")
 
 local listaClimas = {"Por Defecto", "Anochecer", "Media Noche (Apagón)", "Tormenta Oscura"}
--- Corregido: Dropdowns con formato V3.1
 ExtrasTab:CreateDropdown("E_SkyAtmosphere", "Seleccionar Clima / Hora:", listaClimas, function(seleccion)
     states.CurrentAtmosphere = seleccion
     if seleccion == "Por Defecto" then
@@ -614,6 +608,7 @@ RunService.RenderStepped:Connect(function(dt)
         if camera then
             if camera.FieldOfView ~= 70 then camera.FieldOfView = 70 end
             if states.StretchedResValue < 1.0 then
+                -- 🚀 OPTIMIZACIÓN: Usa la variable fija pre-calculada en el Slider.
                 camera.CFrame = camera.CFrame * currentStretchedCFrame
             end
         end
@@ -646,6 +641,7 @@ RunService.RenderStepped:Connect(function(dt)
             end
              
             local targetID = states.CrosshairActiveID == "Original" and OriginalCrosshairID or ("rbxassetid://" .. states.CrosshairActiveID)
+            -- 🚀 OPTIMIZACIÓN: Reemplazo total de ipairs por un bucle numérico directo indexado
             for i = 1, totalCrosshairs do
                 local uiElement = cachedCrosshairs[i]
                 pcall(function()
@@ -704,7 +700,7 @@ RunService.RenderStepped:Connect(function(dt)
                             local currentPos = mainPart.Position
                             local state = knifeStates[obj]
                             local isMoving = true
-            
+          
                             if not state then 
                                 knifeStates[obj] = {lastPosition = currentPos, framesStuck = 0}
                             else
@@ -723,7 +719,6 @@ RunService.RenderStepped:Connect(function(dt)
                             end
                             
                             local hl = obj:FindFirstChild("KillerHubKnifeHighlight")
-                
                             if isMoving then
                                 if not hl then
                                     hl = Instance_new("Highlight")
@@ -891,8 +886,7 @@ end)
 
 ExtrasTab:CreateSection("Estilo de Interfaz")
 
--- Corregido: Slider con step 1 (0.1 en saltos ya no aplica por ser división entera / 100)
-ExtrasTab:CreateSlider("E_StatsOpacity", "Transparencia Fondo (%)", 0, 100, 1, function(valor)
+ExtrasTab:CreateSlider("E_StatsOpacity", "Transparencia Fondo (%)", 0, 100, function(valor)
     states.statsBgTransparency = valor / 100
     if statsFrame then statsFrame.BackgroundTransparency = states.statsBgTransparency end
 end)
