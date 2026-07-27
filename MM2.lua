@@ -542,3 +542,5 @@ KillerHub:AddTask(function()
 end)
 
 KillerHub:NotifySuccess("Extras", "Loaded successfully", 3)
+
+return Killerhub
