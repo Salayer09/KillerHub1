@@ -346,7 +346,7 @@ TabExtras:CreateToggle("Extras_ShowRoundTime", "Round Time", function(enabled)
                 zeroTime = tick()
             end
 
-            if tick() - zeroTime <= 3 then
+            if tick() - zeroTime <= 10 then
                 label.Visible = true
                 label.Text = "00:00"
                 label.TextColor3 = Color3.fromRGB(255, 40, 40)
