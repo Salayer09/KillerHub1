@@ -541,6 +541,6 @@ KillerHub:AddTask(function()
     getgenv().__KillerHub_Extras_Loaded = nil
 end)
 
-KillerHub:NotifySuccess("Extras", "Loaded successfully", 3)
+KillerHub:NotifySuccess("Killer Hub", "script working correctly", 3)
 
 return Killerhub
