@@ -2,7 +2,7 @@
 -- KILLER HUB UI - EXTRAS MODULE (OPTIMIZED + NO LIGHTS)
 --==============================================================================
 
-local KillerHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/Salayer09/KILLERHUB3/refs/heads/main/Murder.lua"))()
+local KillerHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/Salayer09/m.u.r.d.e.r.pzaoxl/refs/heads/main/Murder.lua"))()
 
 if getgenv().__KillerHub_Extras_Loaded then
     KillerHub:NotifyWarn("Already Loaded", "The script is already running.", 3)
