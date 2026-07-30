@@ -1,5 +1,5 @@
 --==============================================================================
--- KILLER HUB UI - EXTRAS MODULE (WITH KNIFE, TRAPS ESP & PERF OVERLAY)
+-- KILLER HUB UI - EXTRAS MODULE (OPTIMIZED)
 --==============================================================================
 
 local KillerHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/Salayer09/KILLERHUB3/refs/heads/main/Murder.lua"))()
@@ -35,7 +35,7 @@ end
 local TabExtras = KillerHub:CreateTab("Extras", "Code")
 
 --------------------------------------------------------------------------------
--- 0. SYSTEM PERFORMANCE OVERLAY (COMPACT & ULTRA LIGHT)
+-- 0. SYSTEM PERFORMANCE OVERLAY
 --------------------------------------------------------------------------------
 local statsConnection = nil
 local statsGui = nil
@@ -58,7 +58,7 @@ end
 -- 1. SHOW ROUND TIME LOGIC
 --------------------------------------------------------------------------------
 local RoundTimerGui = nil
-local RoundTimerConnection = nil
+local timerRunning = false
 
 local function CreateTimerUI()
     if RoundTimerGui then RoundTimerGui:Destroy() end
@@ -147,7 +147,7 @@ local function CreateKnifeBox(targetPart)
 end
 
 local function ProcessPartOrModel(obj)
-    if not obj then return nil end
+    if not obj or not obj.Parent then return nil end
     
     if obj:IsA("BasePart") then
         return obj
@@ -181,7 +181,7 @@ local function IsPartEquippedOrInWorkspace(part)
 end
 
 --------------------------------------------------------------------------------
--- 3. SEE TRAPS ESP LOGIC (OPTIMIZED)
+-- 3. SEE TRAPS ESP LOGIC
 --------------------------------------------------------------------------------
 local TrapsESP_Connection = nil
 local TrapsWorkspaceConnection = nil
@@ -321,44 +321,41 @@ end)
 TabExtras:CreateSection("Round Info")
 
 TabExtras:CreateToggle("Extras_ShowRoundTime", "Round Time", function(enabled)
+    timerRunning = enabled
     if enabled then
         local label = CreateTimerUI()
-        local zeroTime = nil
-        local lastCheck = 0
-
-        RoundTimerConnection = RunService.Heartbeat:Connect(function()
-            if os_clock() - lastCheck < 0.2 then return end
-            lastCheck = os_clock()
-
-            local timerPart = Workspace:FindFirstChild("RoundTimerPart")
-            if timerPart then
-                local secondsRemaining = timerPart:GetAttribute("Time")
-                if secondsRemaining and tonumber(secondsRemaining) and secondsRemaining > 0 then
-                    zeroTime = nil
-                    label.Visible = true
-                    label.Text = FormatTime(secondsRemaining)
-                    label.TextColor3 = Color3.fromRGB(255, 255, 255)
-                    return
+        
+        task.spawn(function()
+            local zeroTime = nil
+            while timerRunning do
+                local timerPart = Workspace:FindFirstChild("RoundTimerPart")
+                if timerPart then
+                    local secondsRemaining = timerPart:GetAttribute("Time")
+                    if secondsRemaining and tonumber(secondsRemaining) and secondsRemaining > 0 then
+                        zeroTime = nil
+                        label.Visible = true
+                        label.Text = FormatTime(secondsRemaining)
+                        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+                        task.wait(0.2)
+                        continue
+                    end
                 end
-            end
 
-            if not zeroTime then
-                zeroTime = tick()
-            end
+                if not zeroTime then
+                    zeroTime = tick()
+                end
 
-            if tick() - zeroTime <= 10 then
-                label.Visible = true
-                label.Text = "00:00"
-                label.TextColor3 = Color3.fromRGB(255, 40, 40)
-            else
-                label.Visible = false
+                if tick() - zeroTime <= 10 then
+                    label.Visible = true
+                    label.Text = "00:00"
+                    label.TextColor3 = Color3.fromRGB(255, 40, 40)
+                else
+                    label.Visible = false
+                end
+                task.wait(0.2)
             end
         end)
     else
-        if RoundTimerConnection then
-            RoundTimerConnection:Disconnect()
-            RoundTimerConnection = nil
-        end
         RemoveTimerUI()
     end
 end)
@@ -370,7 +367,7 @@ TabExtras:CreateToggle("Extras_SeeKnifeESP", "Knife ESP", function(enabled)
         local lastScan = 0
 
         KnifeESP_Connection = RunService.Heartbeat:Connect(function()
-            if os_clock() - lastScan < 0.15 then return end
+            if os_clock() - lastScan < 0.2 then return end
             lastScan = os_clock()
 
             local currentTargets = {}
@@ -418,11 +415,11 @@ TabExtras:CreateToggle("Extras_SeeKnifeESP", "Knife ESP", function(enabled)
         end)
 
         KnifeWorkspaceConnection = Workspace.ChildAdded:Connect(function(child)
-            task.spawn(function()
-                if child.Name == "Knife" or child.Name == "FlyingKnife" or child:GetAttribute("ThrowSpeed") or child:FindFirstChild("KnifeClient") then
+            if child.Name == "Knife" or child.Name == "FlyingKnife" or child:GetAttribute("ThrowSpeed") or child:FindFirstChild("KnifeClient") then
+                task.spawn(function()
                     local validPart = ProcessPartOrModel(child)
                     local attempts = 0
-                    while not validPart and attempts < 10 do
+                    while not validPart and attempts < 10 and child.Parent do
                         task.wait(0.05)
                         attempts = attempts + 1
                         validPart = ProcessPartOrModel(child)
@@ -430,8 +427,8 @@ TabExtras:CreateToggle("Extras_SeeKnifeESP", "Knife ESP", function(enabled)
                     if validPart and IsPartEquippedOrInWorkspace(validPart) then
                         CreateKnifeBox(validPart)
                     end
-                end
-            end)
+                end)
+            end
         end)
     else
         if KnifeESP_Connection then
@@ -481,15 +478,16 @@ TabExtras:CreateToggle("Extras_SeeTraps", "Traps ESP", function(enabled)
             end
         end)
 
-        TrapsWorkspaceConnection = Workspace.DescendantAdded:Connect(function(descendant)
-            if descendant.Name == "Trap" then
+        -- Escuchar únicamente ChildAdded en Workspace para ahorrar recursos
+        TrapsWorkspaceConnection = Workspace.ChildAdded:Connect(function(child)
+            if child.Name == "Trap" then
                 task.spawn(function()
-                    local validPart = ProcessPartOrModel(descendant)
+                    local validPart = ProcessPartOrModel(child)
                     local attempts = 0
-                    while not validPart and attempts < 10 do
+                    while not validPart and attempts < 10 and child.Parent do
                         task.wait(0.05)
                         attempts = attempts + 1
-                        validPart = ProcessPartOrModel(descendant)
+                        validPart = ProcessPartOrModel(child)
                     end
                     if validPart and validPart:IsDescendantOf(Workspace) then
                         CreateTrapBox(validPart)
@@ -514,11 +512,8 @@ end)
 -- CLEANUP TASK
 --------------------------------------------------------------------------------
 KillerHub:AddTask(function()
+    timerRunning = false
     CleanUpPerfOverlay()
-    if RoundTimerConnection then
-        RoundTimerConnection:Disconnect()
-        RoundTimerConnection = nil
-    end
     if KnifeESP_Connection then
         KnifeESP_Connection:Disconnect()
         KnifeESP_Connection = nil
@@ -543,4 +538,4 @@ end)
 
 KillerHub:NotifySuccess("Killer Hub", "script working correctly", 3)
 
-return Killerhub
+return KillerHub
