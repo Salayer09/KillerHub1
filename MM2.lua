@@ -1,5 +1,5 @@
 --==============================================================================
--- KILLER HUB UI - EXTRAS MODULE (OPTIMIZED)
+-- KILLER HUB UI - EXTRAS MODULE (OPTIMIZED + NO LIGHTS)
 --==============================================================================
 
 local KillerHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/Salayer09/KILLERHUB3/refs/heads/main/Murder.lua"))()
@@ -16,6 +16,7 @@ local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local StatsService = game:GetService("Stats")
+local Lighting = game:GetService("Lighting")
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -35,7 +36,7 @@ end
 local TabExtras = KillerHub:CreateTab("Extras", "Code")
 
 --------------------------------------------------------------------------------
--- 0. SYSTEM PERFORMANCE OVERLAY
+-- 0. SYSTEM PERFORMANCE OVERLAY (COMPACT & ULTRA LIGHT)
 --------------------------------------------------------------------------------
 local statsConnection = nil
 local statsGui = nil
@@ -58,7 +59,7 @@ end
 -- 1. SHOW ROUND TIME LOGIC
 --------------------------------------------------------------------------------
 local RoundTimerGui = nil
-local timerRunning = false
+local RoundTimerConnection = nil
 
 local function CreateTimerUI()
     if RoundTimerGui then RoundTimerGui:Destroy() end
@@ -147,7 +148,7 @@ local function CreateKnifeBox(targetPart)
 end
 
 local function ProcessPartOrModel(obj)
-    if not obj or not obj.Parent then return nil end
+    if not obj then return nil end
     
     if obj:IsA("BasePart") then
         return obj
@@ -181,7 +182,7 @@ local function IsPartEquippedOrInWorkspace(part)
 end
 
 --------------------------------------------------------------------------------
--- 3. SEE TRAPS ESP LOGIC
+-- 3. SEE TRAPS ESP LOGIC (OPTIMIZED)
 --------------------------------------------------------------------------------
 local TrapsESP_Connection = nil
 local TrapsWorkspaceConnection = nil
@@ -222,6 +223,73 @@ local function CreateTrapBox(targetPart)
     end
 
     ActiveTrapAdornments[targetPart] = box
+end
+
+--------------------------------------------------------------------------------
+-- 4. NO LIGHTS LOGIC (NEON REMOVAL & SOFT OUTDOOR AMBIENT)
+--------------------------------------------------------------------------------
+local NoLightsConnection = nil
+local OriginalMaterials = {}
+local OriginalLightProps = {}
+local OriginalLightingProps = {}
+
+local function RemoveBrightGlaring(inst)
+    if inst:IsA("BasePart") and inst.Material == Enum.Material.Neon then
+        if not OriginalMaterials[inst] then
+            OriginalMaterials[inst] = inst.Material
+        end
+        inst.Material = Enum.Material.SmoothPlastic
+    elseif inst:IsA("Light") then
+        if not OriginalLightProps[inst] then
+            OriginalLightProps[inst] = inst.Brightness
+        end
+        if inst.Brightness > 1.2 then
+            inst.Brightness = 0.8
+        end
+    end
+end
+
+local function ApplyNoLightsSettings()
+    -- Guardar configuración global original de iluminación
+    OriginalLightingProps.OutdoorAmbient = Lighting.OutdoorAmbient
+    OriginalLightingProps.Brightness = Lighting.Brightness
+
+    -- Suavizar ambiente exterior (menos brillo al aire libre sin quedar a oscuras)
+    local curOutdoor = Lighting.OutdoorAmbient
+    Lighting.OutdoorAmbient = Color3.fromRGB(
+        math.clamp(math.floor(curOutdoor.R * 255 * 0.55), 70, 255),
+        math.clamp(math.floor(curOutdoor.G * 255 * 0.55), 70, 255),
+        math.clamp(math.floor(curOutdoor.B * 255 * 0.55), 70, 255)
+    )
+
+    if Lighting.Brightness > 1.0 then
+        Lighting.Brightness = 1.0
+    end
+end
+
+local function RestoreOriginalLights()
+    for part, mat in pairs(OriginalMaterials) do
+        if part and part.Parent then
+            part.Material = mat
+        end
+    end
+    table.clear(OriginalMaterials)
+
+    for light, brightness in pairs(OriginalLightProps) do
+        if light and light.Parent then
+            light.Brightness = brightness
+        end
+    end
+    table.clear(OriginalLightProps)
+
+    -- Restaurar Iluminación Ambiental
+    if OriginalLightingProps.OutdoorAmbient then
+        Lighting.OutdoorAmbient = OriginalLightingProps.OutdoorAmbient
+    end
+    if OriginalLightingProps.Brightness then
+        Lighting.Brightness = OriginalLightingProps.Brightness
+    end
+    table.clear(OriginalLightingProps)
 end
 
 --------------------------------------------------------------------------------
@@ -321,53 +389,86 @@ end)
 TabExtras:CreateSection("Round Info")
 
 TabExtras:CreateToggle("Extras_ShowRoundTime", "Round Time", function(enabled)
-    timerRunning = enabled
     if enabled then
         local label = CreateTimerUI()
-        
-        task.spawn(function()
-            local zeroTime = nil
-            while timerRunning do
-                local timerPart = Workspace:FindFirstChild("RoundTimerPart")
-                if timerPart then
-                    local secondsRemaining = timerPart:GetAttribute("Time")
-                    if secondsRemaining and tonumber(secondsRemaining) and secondsRemaining > 0 then
-                        zeroTime = nil
-                        label.Visible = true
-                        label.Text = FormatTime(secondsRemaining)
-                        label.TextColor3 = Color3.fromRGB(255, 255, 255)
-                        task.wait(0.2)
-                        continue
-                    end
-                end
+        local zeroTime = nil
+        local lastCheck = 0
 
-                if not zeroTime then
-                    zeroTime = tick()
-                end
+        RoundTimerConnection = RunService.Heartbeat:Connect(function()
+            if os_clock() - lastCheck < 0.2 then return end
+            lastCheck = os_clock()
 
-                if tick() - zeroTime <= 10 then
+            local timerPart = Workspace:FindFirstChild("RoundTimerPart")
+            if timerPart then
+                local secondsRemaining = timerPart:GetAttribute("Time")
+                if secondsRemaining and tonumber(secondsRemaining) and secondsRemaining > 0 then
+                    zeroTime = nil
                     label.Visible = true
-                    label.Text = "00:00"
-                    label.TextColor3 = Color3.fromRGB(255, 40, 40)
-                else
-                    label.Visible = false
+                    label.Text = FormatTime(secondsRemaining)
+                    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    return
                 end
-                task.wait(0.2)
+            end
+
+            if not zeroTime then
+                zeroTime = tick()
+            end
+
+            if tick() - zeroTime <= 10 then
+                label.Visible = true
+                label.Text = "00:00"
+                label.TextColor3 = Color3.fromRGB(255, 40, 40)
+            else
+                label.Visible = false
             end
         end)
     else
+        if RoundTimerConnection then
+            RoundTimerConnection:Disconnect()
+            RoundTimerConnection = nil
+        end
         RemoveTimerUI()
     end
 end)
 
 TabExtras:CreateSection("Visuals")
 
+TabExtras:CreateToggle("Extras_NoLights", "No lights", function(enabled)
+    if enabled then
+        ApplyNoLightsSettings()
+
+        -- Proceso optimizado por bloques para evitar caídas bruscas de FPS
+        task.spawn(function()
+            local descendants = Workspace:GetDescendants()
+            for i = 1, #descendants do
+                RemoveBrightGlaring(descendants[i])
+                if i % 350 == 0 then
+                    task.wait()
+                end
+            end
+        end)
+
+        -- Escuchar nuevos objetos añadidos dinámicamente
+        NoLightsConnection = Workspace.DescendantAdded:Connect(function(desc)
+            task.spawn(function()
+                RemoveBrightGlaring(desc)
+            end)
+        end)
+    else
+        if NoLightsConnection then
+            NoLightsConnection:Disconnect()
+            NoLightsConnection = nil
+        end
+        RestoreOriginalLights()
+    end
+end)
+
 TabExtras:CreateToggle("Extras_SeeKnifeESP", "Knife ESP", function(enabled)
     if enabled then
         local lastScan = 0
 
         KnifeESP_Connection = RunService.Heartbeat:Connect(function()
-            if os_clock() - lastScan < 0.2 then return end
+            if os_clock() - lastScan < 0.15 then return end
             lastScan = os_clock()
 
             local currentTargets = {}
@@ -415,11 +516,11 @@ TabExtras:CreateToggle("Extras_SeeKnifeESP", "Knife ESP", function(enabled)
         end)
 
         KnifeWorkspaceConnection = Workspace.ChildAdded:Connect(function(child)
-            if child.Name == "Knife" or child.Name == "FlyingKnife" or child:GetAttribute("ThrowSpeed") or child:FindFirstChild("KnifeClient") then
-                task.spawn(function()
+            task.spawn(function()
+                if child.Name == "Knife" or child.Name == "FlyingKnife" or child:GetAttribute("ThrowSpeed") or child:FindFirstChild("KnifeClient") then
                     local validPart = ProcessPartOrModel(child)
                     local attempts = 0
-                    while not validPart and attempts < 10 and child.Parent do
+                    while not validPart and attempts < 10 do
                         task.wait(0.05)
                         attempts = attempts + 1
                         validPart = ProcessPartOrModel(child)
@@ -427,8 +528,8 @@ TabExtras:CreateToggle("Extras_SeeKnifeESP", "Knife ESP", function(enabled)
                     if validPart and IsPartEquippedOrInWorkspace(validPart) then
                         CreateKnifeBox(validPart)
                     end
-                end)
-            end
+                end
+            end)
         end)
     else
         if KnifeESP_Connection then
@@ -478,13 +579,12 @@ TabExtras:CreateToggle("Extras_SeeTraps", "Traps ESP", function(enabled)
             end
         end)
 
-        -- Escuchar únicamente ChildAdded en Workspace para ahorrar recursos
         TrapsWorkspaceConnection = Workspace.ChildAdded:Connect(function(child)
             if child.Name == "Trap" then
                 task.spawn(function()
                     local validPart = ProcessPartOrModel(child)
                     local attempts = 0
-                    while not validPart and attempts < 10 and child.Parent do
+                    while not validPart and attempts < 10 do
                         task.wait(0.05)
                         attempts = attempts + 1
                         validPart = ProcessPartOrModel(child)
@@ -512,8 +612,11 @@ end)
 -- CLEANUP TASK
 --------------------------------------------------------------------------------
 KillerHub:AddTask(function()
-    timerRunning = false
     CleanUpPerfOverlay()
+    if RoundTimerConnection then
+        RoundTimerConnection:Disconnect()
+        RoundTimerConnection = nil
+    end
     if KnifeESP_Connection then
         KnifeESP_Connection:Disconnect()
         KnifeESP_Connection = nil
@@ -530,6 +633,11 @@ KillerHub:AddTask(function()
         TrapsWorkspaceConnection:Disconnect()
         TrapsWorkspaceConnection = nil
     end
+    if NoLightsConnection then
+        NoLightsConnection:Disconnect()
+        NoLightsConnection = nil
+    end
+    RestoreOriginalLights()
     RemoveTimerUI()
     ClearKnifeESP()
     ClearTrapsESP()
